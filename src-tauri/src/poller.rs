@@ -30,8 +30,45 @@ pub struct AccountStatus {
     pub extra_usage: bool,
     /// 카드 머리에 붙이는 짧은 정보 (예: "크레딧 120")
     pub badge: Option<String>,
+    /// 최근 7일 사용률 추이 (5시간 한도, 없으면 주간 한도)
+    pub trend: Option<Trend>,
     /// 마지막으로 성공한 조회 시각. 실패해도 이전 값을 유지한다.
     pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Trend {
+    /// 어떤 한도의 추이인지 ("session" 또는 "weekly")
+    pub key: String,
+    /// 가장 오래된 칸의 시작 시각
+    pub start: DateTime<Utc>,
+    pub bucket_hours: i64,
+    /// 칸마다 그 시간대의 최대 사용률. 기록이 없으면 null
+    pub buckets: Vec<Option<f64>>,
+}
+
+const TREND_DAYS: i64 = 7;
+const TREND_BUCKET_HOURS: i64 = 2;
+
+/// 최근 7일 기록을 2시간 칸으로 묶어 칸마다 최대값을 구한다.
+fn build_trend(key: &str, hist: &[Sample], now: DateTime<Utc>) -> Option<Trend> {
+    let n = (TREND_DAYS * 24 / TREND_BUCKET_HOURS) as usize;
+    let bucket = Duration::hours(TREND_BUCKET_HOURS);
+    // 칸 경계를 정시에 맞춘다
+    let end = now - Duration::seconds(now.timestamp() % bucket.num_seconds()) + bucket;
+    let start = end - bucket * n as i32;
+    let mut buckets: Vec<Option<f64>> = vec![None; n];
+    for s in hist.iter().filter(|s| s.t >= start && s.t < end) {
+        let i = ((s.t - start).num_seconds() / bucket.num_seconds()) as usize;
+        let slot = &mut buckets[i.min(n - 1)];
+        *slot = Some(slot.map_or(s.p, |v| v.max(s.p)));
+    }
+    buckets.iter().any(Option::is_some).then(|| Trend {
+        key: key.to_string(),
+        start,
+        bucket_hours: TREND_BUCKET_HOURS,
+        buckets,
+    })
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -185,6 +222,10 @@ pub async fn refresh_all(app: &AppHandle) {
                             LimitView { limit: l, eta, safe_until_reset: safe }
                         })
                         .collect();
+                    let trend = ["session", "weekly"].iter().find_map(|k| {
+                        let hist = rt.history.get(&format!("{}|{}", account.id, k))?;
+                        build_trend(k, hist, now)
+                    });
                     rt.statuses.insert(
                         account.id.clone(),
                         AccountStatus {
@@ -195,6 +236,7 @@ pub async fn refresh_all(app: &AppHandle) {
                             limits: views,
                             extra_usage,
                             badge,
+                            trend,
                             updated_at: Some(now),
                         },
                     );
@@ -216,6 +258,7 @@ pub async fn refresh_all(app: &AppHandle) {
                             limits: prev.as_ref().map(|p| p.limits.clone()).unwrap_or_default(),
                             extra_usage: prev.as_ref().is_some_and(|p| p.extra_usage),
                             badge: prev.as_ref().and_then(|p| p.badge.clone()),
+                            trend: prev.as_ref().and_then(|p| p.trend.clone()),
                             updated_at: prev.and_then(|p| p.updated_at),
                         },
                     );
@@ -356,6 +399,23 @@ mod tests {
         let reset = Some(now + Duration::minutes(20));
         let hist = vec![Sample { t: now - Duration::minutes(30), p: 40.0, r: reset }];
         assert_eq!(estimate(&hist, now, 60.0, reset, Duration::minutes(45)), (None, true));
+    }
+
+    #[test]
+    fn trend_buckets_take_max_and_skip_old() {
+        let now = Utc::now();
+        let hist = vec![
+            Sample { t: now - Duration::days(8), p: 99.0, r: None }, // 7일보다 오래됨
+            Sample { t: now - Duration::minutes(30), p: 10.0, r: None },
+            Sample { t: now - Duration::minutes(5), p: 30.0, r: None },
+        ];
+        let t = build_trend("session", &hist, now).unwrap();
+        assert_eq!(t.buckets.len(), 84);
+        let filled: Vec<f64> = t.buckets.iter().flatten().copied().collect();
+        assert!(!filled.contains(&99.0));
+        assert_eq!(filled.iter().cloned().fold(0.0, f64::max), 30.0);
+        assert!(t.start <= now - Duration::days(7) + Duration::hours(2));
+        assert!(build_trend("session", &[], now).is_none());
     }
 
     #[test]

@@ -149,8 +149,94 @@ function cardHtml(a) {
         <span class="svc ${svc.cls}">${esc(svc.name)}</span>
         <span class="name" title="${esc(a.label)}">${esc(a.label)}</span>${badges}
       </div>
-      ${body}${err}
+      ${body}${trendHtml(st?.trend)}${err}
     </section>`;
+}
+
+/** 최근 7일 추이: 2시간 칸마다 최대 사용률을 막대로 그린다. */
+function trendHtml(t) {
+  if (!t || !t.buckets?.length) return "";
+  const n = t.buckets.length;
+  const H = 24;
+  const start = new Date(t.start).getTime();
+  const stepMs = t.bucket_hours * HOUR;
+  const bars = t.buckets
+    .map((v, i) => {
+      if (v == null) return "";
+      const h = Math.max(1, (Math.min(100, v) / 100) * H);
+      const from = new Date(start + i * stepMs);
+      const tip = `${fmtClock(from)}부터 ${t.bucket_hours}시간 · 최대 ${Math.round(v)}%`;
+      return `<rect class="${level(v)}" x="${i + 0.1}" y="${H - h}" width="0.8" height="${h}"><title>${esc(tip)}</title></rect>`;
+    })
+    .join("");
+  // 하루 경계(현지 자정)에 옅은 세로선
+  const lines = [];
+  for (let i = 1; i < n; i++) {
+    const d = new Date(start + i * stepMs);
+    if (d.getHours() < t.bucket_hours && new Date(start + (i - 1) * stepMs).getDate() !== d.getDate()) {
+      lines.push(`<line x1="${i}" x2="${i}" y1="0" y2="${H}"/>`);
+    }
+  }
+  const what = t.key === "session" ? "5시간 사용률" : "주간 사용률";
+  return `
+    <div class="trend">
+      <div class="trend-head"><span>최근 7일 ${what}</span><span>2시간 단위 최대값</span></div>
+      <svg viewBox="0 0 ${n} ${H}" preserveAspectRatio="none" aria-label="최근 7일 ${what} 추이">${lines.join("")}${bars}</svg>
+      <div class="trend-axis"><span>7일 전</span><span>지금</span></div>
+    </div>`;
+}
+
+/** 미니 모드 한 줄에 쓰는 짧은 이름 */
+const SHORT = { session: "5h", weekly: "주", budget: "월", spend: "월" };
+
+/** 미니 모드: 계정당 한 줄 (이름 + 주요 한도 2개) */
+function compactRowHtml(a) {
+  const st = snap.statuses[a.id];
+  const svc = SERVICES[a.source.kind] ?? { name: "", cls: "" };
+  const cells = (st?.limits ?? [])
+    .filter((l) => MAIN_KEYS.includes(l.key))
+    .slice(0, 2)
+    .map((l) => {
+      const value = l.display ?? `${Math.round(l.percent)}%`;
+      const reset = l.resets_at ? ` · ${fmtClock(new Date(l.resets_at))} 초기화` : "";
+      const bar = l.no_bar
+        ? ""
+        : `<div class="bar"><i style="width:${Math.max(0, Math.min(100, l.percent))}%"></i></div>`;
+      return `
+        <div class="cell ${l.no_bar ? "" : level(l.percent)}" title="${esc(l.label)} ${esc(value)}${esc(reset)}">
+          <span class="k">${SHORT[l.key] ?? ""}</span>${bar}<span class="pct">${esc(value)}</span>
+        </div>`;
+    })
+    .join("");
+  const warn = st && !st.ok ? `<span class="warn" title="${esc(st.error)}">⚠</span>` : "";
+  return `
+    <section class="crow ${st && !st.ok ? "stale" : ""}">
+      <span class="svc ${svc.cls}" title="${esc(svc.name)}">${esc(svc.name.slice(0, 1))}</span>
+      <span class="name" title="${esc(a.label)}">${esc(a.label)}</span>${warn}
+      <div class="cells">${cells || `<span class="sub">불러오는 중…</span>`}</div>
+    </section>`;
+}
+
+/** 미니 모드에서 창 높이를 내용에 맞춘다. 전체 모드로 돌아갈 때 쓸 높이는 따로 기억한다. */
+let wasCompact = false;
+
+function fitWindow() {
+  const compact = !!snap.settings.compact && view === "usage";
+  if (compact && !wasCompact && window.innerHeight > 300) localSet("fullHeight", window.innerHeight);
+  if (!compact && wasCompact) {
+    invoke("fit_height", { height: Number(localGet("fullHeight")) || 560 });
+  }
+  wasCompact = compact;
+  if (!compact) return;
+  const need = document.querySelector("header").offsetHeight + $("view-usage").scrollHeight + 2;
+  if (Math.abs(window.innerHeight - need) > 2) invoke("fit_height", { height: need });
+}
+
+function localGet(k) {
+  try { return localStorage.getItem(k); } catch { return null; }
+}
+function localSet(k, v) {
+  try { localStorage.setItem(k, String(v)); } catch { /* 저장 못 해도 동작에는 지장 없음 */ }
 }
 
 function renderUsage() {
@@ -165,9 +251,12 @@ function renderUsage() {
         </div>
         <button class="link" data-action="settings">API 사용액 등 다른 방법으로 추가</button>
       </div>`;
+  } else if (snap.settings.compact) {
+    el.innerHTML = snap.accounts.map(compactRowHtml).join("");
   } else {
     el.innerHTML = snap.accounts.map(cardHtml).join("");
   }
+  document.body.classList.toggle("compact", !!snap.settings.compact);
   tick();
 }
 
@@ -244,8 +333,16 @@ function renderSettings() {
   $("set-notify").checked = s.notifications;
   $("set-notify-reset").checked = s.notify_reset;
   $("set-tray-percent").checked = s.tray_percent ?? true;
+  $("set-compact").checked = !!s.compact;
+  $("set-shortcut").value = prettyShortcut(s.shortcut ?? "");
   $("set-ontop").checked = s.always_on_top;
   $("set-autostart").checked = snap.autostart;
+}
+
+/** "CommandOrControl+Shift+U" → "Ctrl+Shift+U" (macOS는 "Cmd") */
+function prettyShortcut(s) {
+  const mac = /Mac/i.test(navigator.platform);
+  return s.replace(/CommandOrControl|CmdOrCtrl/gi, mac ? "Cmd" : "Ctrl");
 }
 
 function render() {
@@ -253,6 +350,10 @@ function render() {
   $("view-settings").hidden = view !== "settings";
   if (view === "usage") renderUsage();
   else renderSettings();
+  fitWindow();
+  const sc = snap.settings.shortcut;
+  $("btn-hide").title = `숨기기 (트레이 아이콘${sc ? ` 또는 ${prettyShortcut(sc)}` : ""}로 다시 열기)`;
+  $("btn-compact").title = snap.settings.compact ? "전체 보기로 전환" : "미니 모드로 전환";
 }
 
 function show(v) {
@@ -295,6 +396,7 @@ function saveSettings() {
     notifications: $("set-notify").checked,
     notify_reset: $("set-notify-reset").checked,
     tray_percent: $("set-tray-percent").checked,
+    compact: $("set-compact").checked,
     always_on_top: $("set-ontop").checked,
   };
   call("update_settings", { settings: s });
@@ -383,7 +485,39 @@ $("btn-add-cc").addEventListener("click", async () => {
   toast("Claude Code 계정을 추가했습니다.");
 });
 
-for (const id of ["set-interval", "set-warn", "set-crit", "set-notify", "set-notify-reset", "set-tray-percent", "set-ontop"]) {
+$("btn-compact").addEventListener("click", () => {
+  call("update_settings", { settings: { ...snap.settings, compact: !snap.settings.compact } });
+});
+
+/** 단축키 칸: 누른 키 조합을 그대로 받아 저장한다. Backspace/Delete는 끄기. */
+const MOD_KEYS = ["Control", "Shift", "Alt", "Meta"];
+$("set-shortcut").addEventListener("keydown", (e) => {
+  e.preventDefault();
+  if (e.key === "Tab") return;
+  if (e.key === "Backspace" || e.key === "Delete") {
+    call("update_settings", { settings: { ...snap.settings, shortcut: "" } });
+    return;
+  }
+  if (MOD_KEYS.includes(e.key)) return; // 조합 키만 누른 상태
+  const mods = [];
+  if (e.ctrlKey) mods.push("Ctrl");
+  if (e.altKey) mods.push("Alt");
+  if (e.shiftKey) mods.push("Shift");
+  if (e.metaKey) mods.push("Super");
+  if (!mods.length) {
+    toast("Ctrl·Alt·Shift 중 하나 이상과 함께 눌러 주세요.", true);
+    return;
+  }
+  // e.code: "KeyU" → "U", "Digit1" → "1", "F5" → "F5"
+  const key = e.code.replace(/^Key/, "").replace(/^Digit/, "");
+  const shortcut = [...mods, key].join("+");
+  $("set-shortcut").value = prettyShortcut(shortcut);
+  call("update_settings", { settings: { ...snap.settings, shortcut } })
+    .then(() => toast(`단축키를 ${prettyShortcut(shortcut)}(으)로 바꿨습니다.`))
+    .catch(() => ($("set-shortcut").value = prettyShortcut(snap.settings.shortcut ?? "")));
+});
+
+for (const id of ["set-interval", "set-warn", "set-crit", "set-notify", "set-notify-reset", "set-tray-percent", "set-compact", "set-ontop"]) {
   $(id).addEventListener("change", saveSettings);
 }
 $("set-autostart").addEventListener("change", (e) => call("set_autostart", { enabled: e.target.checked }));

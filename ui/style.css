@@ -155,6 +155,32 @@ main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 3px; }
 .eta.safe { color: var(--ok); }
 
 .models { margin-top: 9px; padding-top: 8px; border-top: 1px dashed var(--border); }
+
+/* 최근 7일 추이 */
+.trend { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.trend-head, .trend-axis { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); }
+.trend svg { display: block; width: 100%; height: 28px; margin: 4px 0 2px; background: var(--track); border-radius: 4px; }
+.trend line { stroke: var(--border); stroke-width: 0.15; vector-effect: non-scaling-stroke; }
+.trend rect { fill: var(--lv-low); }
+.trend rect.lvl-mid { fill: var(--ok); }
+.trend rect.lvl-warn { fill: var(--warn); }
+.trend rect.lvl-crit { fill: var(--crit); }
+
+/* 미니 모드: 계정당 한 줄 */
+body.compact main { padding-bottom: 6px; }
+.crow { display: flex; align-items: center; gap: 6px; padding: 5px 8px; margin-top: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.crow.stale .cells { opacity: 0.55; }
+.crow .svc { width: 14px; text-align: center; flex-shrink: 0; }
+.crow .name { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crow .warn { color: var(--crit); font-size: 12px; }
+.cells { display: flex; gap: 8px; flex-shrink: 0; }
+.cell { display: flex; align-items: center; gap: 4px; font-size: 11.5px; }
+.cell .k { color: var(--muted); }
+.cell .bar { width: 34px; height: 5px; margin-top: 0; }
+.cell .pct { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
+
+input.shortcut { width: 150px; text-align: center; cursor: pointer; caret-color: transparent; }
+input.shortcut:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .models .limit + .limit { margin-top: 6px; }
 .models .bar { height: 4px; }
 

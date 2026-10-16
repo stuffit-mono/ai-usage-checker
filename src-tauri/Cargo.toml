@@ -27,6 +27,7 @@ uuid = { version = "1", features = ["v4"] }
 fastrand = "2"
 base64 = "0.22"
 percent-encoding = "2"
+tauri-plugin-global-shortcut = "2"
 
 [profile.release]
 codegen-units = 1

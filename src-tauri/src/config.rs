@@ -44,7 +44,13 @@ pub struct Settings {
     pub notify_reset: bool,
     /// 트레이 아이콘에 가장 높은 사용률을 숫자로 표시
     pub tray_percent: bool,
+    /// 미니 모드: 계정당 한 줄로 줄여 보여준다
+    pub compact: bool,
+    /// 위젯 열기/숨기기 전역 단축키 (빈 문자열이면 사용 안 함)
+    pub shortcut: String,
 }
+
+pub const DEFAULT_SHORTCUT: &str = "CommandOrControl+Shift+U";
 
 impl Default for Settings {
     fn default() -> Self {
@@ -56,6 +62,8 @@ impl Default for Settings {
             notifications: true,
             notify_reset: true,
             tray_percent: true,
+            compact: false,
+            shortcut: DEFAULT_SHORTCUT.to_string(),
         }
     }
 }

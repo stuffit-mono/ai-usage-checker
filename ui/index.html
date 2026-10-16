@@ -14,6 +14,9 @@
       <button class="icon" id="btn-refresh" title="지금 새로고침" aria-label="지금 새로고침">
         <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"/></svg>
       </button>
+      <button class="icon" id="btn-compact" title="미니 모드" aria-label="미니 모드 전환">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
       <button class="icon" id="btn-settings" title="설정" aria-label="설정">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
       </button>
@@ -96,6 +99,11 @@
         <label class="check"><input type="checkbox" id="set-notify"> 사용량 알림 받기</label>
         <label class="check"><input type="checkbox" id="set-notify-reset"> 5시간 세션 초기화 알림</label>
         <label class="check"><input type="checkbox" id="set-tray-percent"> 트레이 아이콘에 사용률 표시</label>
+        <label class="check"><input type="checkbox" id="set-compact"> 미니 모드 (계정당 한 줄)</label>
+        <label class="field">열기/숨기기 단축키
+          <input type="text" id="set-shortcut" class="shortcut" placeholder="사용 안 함" readonly>
+        </label>
+        <p class="hint">칸을 누른 뒤 원하는 키 조합(예: Ctrl+Shift+U)을 누르세요. Backspace를 누르면 단축키를 끕니다.</p>
         <label class="check"><input type="checkbox" id="set-ontop"> 항상 위에 표시</label>
         <label class="check"><input type="checkbox" id="set-autostart"> 로그인 시 자동 실행</label>
       </section>

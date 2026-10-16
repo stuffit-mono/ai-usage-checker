@@ -16,6 +16,7 @@ use std::sync::Mutex;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Wry};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 const LOGIN_WINDOW: &str = "claude-login";
 const CHATGPT_LOGIN_WINDOW: &str = "chatgpt-login";
@@ -496,6 +497,18 @@ fn remove_account(app: AppHandle, id: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 위젯 열기/숨기기 단축키를 (다시) 등록한다. 빈 문자열이면 해제만 한다.
+fn apply_shortcut(app: &AppHandle, shortcut: &str) -> Result<(), String> {
+    let gs = app.global_shortcut();
+    let _ = gs.unregister_all();
+    let s = shortcut.trim();
+    if s.is_empty() {
+        return Ok(());
+    }
+    gs.register(s)
+        .map_err(|e| format!("단축키 '{s}'를 등록하지 못했습니다. 형식이 맞는지, 다른 프로그램이 쓰고 있지 않은지 확인해 주세요. ({e})"))
+}
+
 #[tauri::command]
 fn update_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
     let on_top = settings.always_on_top;
@@ -503,6 +516,18 @@ fn update_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
     s.interval_secs = s.interval_secs.clamp(60, 3600);
     s.warn_percent = s.warn_percent.clamp(10.0, 99.0);
     s.crit_percent = s.crit_percent.clamp(s.warn_percent, 100.0);
+    s.shortcut = s.shortcut.trim().to_string();
+
+    let old_shortcut = app.state::<AppState>().config.lock().unwrap().settings.shortcut.clone();
+    if s.shortcut != old_shortcut {
+        if let Err(e) = apply_shortcut(&app, &s.shortcut) {
+            // 새 단축키가 안 되면 이전 단축키를 되살리고 나머지 설정만 저장한다
+            let _ = apply_shortcut(&app, &old_shortcut);
+            s.shortcut = old_shortcut;
+            mutate_config(&app, |c| c.settings = s)?;
+            return Err(e);
+        }
+    }
     mutate_config(&app, |c| c.settings = s)?;
     set_always_on_top(&app, on_top);
     // 아이콘 표시 여부나 색 기준이 바뀌었을 수 있다
@@ -519,6 +544,16 @@ fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
     }
     emit_snapshot(&app);
     Ok(())
+}
+
+/// 미니 모드에서 위젯 높이를 내용에 맞춘다 (너비는 그대로).
+#[tauri::command]
+fn fit_height(app: AppHandle, height: f64) -> Result<(), String> {
+    let w = app.get_webview_window("main").ok_or("위젯 창을 찾지 못했습니다.")?;
+    let scale = w.scale_factor().map_err(|e| e.to_string())?;
+    let size = w.inner_size().map_err(|e| e.to_string())?.to_logical::<f64>(scale);
+    w.set_size(tauri::LogicalSize::new(size.width, height.clamp(120.0, 1200.0)))
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -545,6 +580,15 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    if event.state() == ShortcutState::Pressed {
+                        tray::toggle_widget(app);
+                    }
+                })
+                .build(),
+        )
+        .plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_state_flags(
                     tauri_plugin_window_state::StateFlags::POSITION | tauri_plugin_window_state::StateFlags::SIZE,
@@ -557,6 +601,7 @@ pub fn run() {
             let history_path = app.path().app_data_dir()?.join("history.json");
             let config = Config::load(&config_path);
             let always_on_top = config.settings.always_on_top;
+            let shortcut = config.settings.shortcut.clone();
             let runtime = poller::Runtime {
                 history: poller::load_history(&history_path),
                 ..Default::default()
@@ -588,6 +633,10 @@ pub fn run() {
             }
 
             tray::setup(app.handle())?;
+            // 다른 프로그램이 같은 단축키를 쓰고 있으면 등록만 건너뛴다 (설정에서 바꿀 수 있음)
+            if let Err(e) = apply_shortcut(app.handle(), &shortcut) {
+                eprintln!("{e}");
+            }
 
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move { poller::run(handle).await });
@@ -607,9 +656,30 @@ pub fn run() {
             remove_account,
             update_settings,
             set_autostart,
+            fit_height,
             refresh_now,
             quit_app,
         ])
         .run(tauri::generate_context!())
         .expect("앱 실행 중 오류");
+}
+
+#[cfg(test)]
+mod tests {
+    use tauri_plugin_global_shortcut::Shortcut;
+
+    /// 설정 화면이 만드는 단축키 문자열을 단축키 라이브러리가 해석할 수 있어야 한다.
+    #[test]
+    fn shortcut_strings_parse() {
+        for s in [
+            crate::config::DEFAULT_SHORTCUT,
+            "Ctrl+Shift+U",
+            "Ctrl+Alt+K",
+            "Alt+Shift+1",
+            "Super+Shift+F5",
+        ] {
+            assert!(s.parse::<Shortcut>().is_ok(), "해석 실패: {s}");
+        }
+        assert!("Ctrl+".parse::<Shortcut>().is_err());
+    }
 }
