@@ -10,6 +10,7 @@
   --crit: #d0443a;
   --ok: #3f8f5a;
   --time: #4f7fb8;
+  --chatgpt: #10a37f;
   --input: #f4f3ee;
   color-scheme: light;
 }
@@ -26,6 +27,7 @@
     --crit: #ef6a5f;
     --ok: #6cbf86;
     --time: #7fa8db;
+    --chatgpt: #3fc79f;
     --input: #343330;
     color-scheme: dark;
   }
@@ -113,6 +115,10 @@ main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 3px; }
 .card.stale .limit { opacity: 0.55; }
 
 .card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.svc { font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
+.svc-claude { color: var(--accent); }
+.svc-chatgpt { color: var(--chatgpt); }
+.svc-api { color: var(--muted); }
 .card-head .name { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badge { font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); white-space: nowrap; }
 .badge.muted { background: var(--track); color: var(--muted); }
@@ -154,7 +160,8 @@ main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 3px; }
 
 .empty { text-align: center; color: var(--muted); padding: 40px 12px; }
 .empty p { margin: 0 0 14px; }
-.empty .link { margin-top: 10px; }
+.empty .link { margin-top: 14px; }
+.empty-actions { display: flex; flex-direction: column; gap: 8px; align-items: center; }
 
 /* 설정 */
 .panel { margin-top: 10px; }
@@ -194,6 +201,10 @@ details > input { margin-top: 8px; }
 .account-list .top input { flex: 1; min-width: 0; padding: 3px 6px; }
 .account-list .top button { padding: 2px 7px; font-size: 12px; }
 .account-list .src { font-size: 11px; color: var(--muted); margin: 4px 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-list .budget { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 6px; font-size: 11.5px; color: var(--muted); }
+.account-list .budget input { width: 80px; padding: 2px 6px; }
+.inline select { flex-shrink: 0; }
+.inline input[type="number"] { text-align: left; }
 .account-list .none { color: var(--muted); font-size: 12px; padding: 4px 2px; background: none; border: 0; }
 
 .row-end { display: flex; justify-content: space-between; padding-bottom: 4px; }

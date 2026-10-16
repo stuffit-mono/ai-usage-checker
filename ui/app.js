@@ -50,17 +50,29 @@ function level(p) {
 const HOUR = 3_600_000;
 
 /** 한도 구간의 전체 길이(ms). 지난 시간 막대에 쓴다. */
-function windowMs(key) {
-  if (key === "session") return 5 * HOUR;
-  if (key === "weekly" || key.startsWith("model:")) return 7 * 24 * HOUR;
+function windowMs(l) {
+  if (l.window_secs) return l.window_secs * 1000;
+  if (l.key === "session") return 5 * HOUR;
+  if (l.key === "weekly" || l.key.startsWith("model:")) return 7 * 24 * HOUR;
   return null;
 }
+
+const MAIN_KEYS = ["session", "weekly", "budget", "spend"];
+
+const SERVICES = {
+  claude_web: { name: "Claude", cls: "svc-claude" },
+  claude_code: { name: "Claude", cls: "svc-claude" },
+  chatgpt_web: { name: "ChatGPT", cls: "svc-chatgpt" },
+  anthropic_admin: { name: "Claude API", cls: "svc-api" },
+  openai_admin: { name: "OpenAI API", cls: "svc-api" },
+};
+const isApi = (a) => a.source.kind === "anthropic_admin" || a.source.kind === "openai_admin";
 
 const CLOCK_ICON = `<svg class="clock" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`;
 
 function limitHtml(l, main) {
   const p = Math.max(0, Math.min(100, l.percent));
-  const win = l.resets_at ? windowMs(l.key) : null;
+  const win = l.resets_at ? windowMs(l) : null;
   let eta = "";
   if (main) {
     if (l.percent >= 100) eta = `<span class="eta danger">한도 도달</span>`;
@@ -85,21 +97,30 @@ function limitHtml(l, main) {
     time = `<div class="sub">${reset}${eta}</div>`;
   }
 
+  const value = l.display ?? `${Math.round(l.percent)}%`;
+  const bar = l.no_bar
+    ? ""
+    : `<div class="bar" title="사용량 ${Math.round(l.percent)}%"><i style="width:${p}%"></i></div>`;
   return `
-    <div class="limit ${main ? "main" : ""} ${level(l.percent)}">
-      <div class="row"><span class="lbl">${esc(l.label)}</span><span class="pct">${Math.round(l.percent)}%</span></div>
-      <div class="bar" title="사용량 ${Math.round(l.percent)}%"><i style="width:${p}%"></i></div>
+    <div class="limit ${main ? "main" : ""} ${l.no_bar ? "" : level(l.percent)}">
+      <div class="row"><span class="lbl">${esc(l.label)}</span><span class="pct">${esc(value)}</span></div>
+      ${bar}
       ${time}
     </div>`;
 }
 
+/** 로그인이 만료됐을 때 "다시 로그인" 버튼이 할 동작 */
+const RELOGIN = { claude_web: "login", chatgpt_web: "login-chatgpt" };
+
 function cardHtml(a) {
   const st = snap.statuses[a.id];
   const limits = st?.limits ?? [];
-  const primary = limits.filter((l) => l.key === "session" || l.key === "weekly");
-  const others = limits.filter((l) => l.key !== "session" && l.key !== "weekly");
+  const primary = limits.filter((l) => MAIN_KEYS.includes(l.key));
+  const others = limits.filter((l) => !MAIN_KEYS.includes(l.key));
+  const svc = SERVICES[a.source.kind] ?? { name: "", cls: "" };
   const badges = [
     a.plan ? `<span class="badge">${esc(a.plan)}</span>` : "",
+    st?.badge ? `<span class="badge muted">${esc(st.badge)}</span>` : "",
     st?.extra_usage ? `<span class="badge muted" title="한도를 넘으면 추가 요금으로 계속 사용">추가 사용</span>` : "",
     a.source.kind === "claude_code" ? `<span class="badge muted">Code</span>` : "",
   ].join("");
@@ -115,13 +136,16 @@ function cardHtml(a) {
 
   let err = "";
   if (st && !st.ok) {
-    const relogin = st.error_kind === "auth" && a.source.kind === "claude_web";
-    err = `<div class="err"><span>${esc(st.error)}</span>${relogin ? `<button data-action="login">다시 로그인</button>` : ""}</div>`;
+    const action = st.error_kind === "auth" ? RELOGIN[a.source.kind] : null;
+    err = `<div class="err"><span>${esc(st.error)}</span>${action ? `<button data-action="${action}">다시 로그인</button>` : ""}</div>`;
   }
 
   return `
     <section class="card ${st && !st.ok ? "stale" : ""}">
-      <div class="card-head"><span class="name" title="${esc(a.label)}">${esc(a.label)}</span>${badges}</div>
+      <div class="card-head">
+        <span class="svc ${svc.cls}">${esc(svc.name)}</span>
+        <span class="name" title="${esc(a.label)}">${esc(a.label)}</span>${badges}
+      </div>
       ${body}${err}
     </section>`;
 }
@@ -132,8 +156,11 @@ function renderUsage() {
     el.innerHTML = `
       <div class="empty">
         <p>추가된 계정이 없습니다.</p>
-        <button class="primary" data-action="login">Claude 계정 추가</button><br>
-        <button class="link" data-action="settings">다른 방법으로 추가</button>
+        <div class="empty-actions">
+          <button class="primary" data-action="login">Claude 계정 추가</button>
+          <button data-action="login-chatgpt">ChatGPT 계정 추가</button>
+        </div>
+        <button class="link" data-action="settings">API 사용액 등 다른 방법으로 추가</button>
       </div>`;
   } else {
     el.innerHTML = snap.accounts.map(cardHtml).join("");
@@ -171,8 +198,15 @@ function tick() {
 // ---------- 설정 화면 ----------
 
 function sourceText(a) {
-  if (a.source.kind === "claude_web") return `claude.ai 로그인${a.plan ? ` · ${a.plan}` : ""}`;
-  return `Claude Code · ${a.source.credentials_path}`;
+  const plan = a.plan ? ` · ${a.plan}` : "";
+  switch (a.source.kind) {
+    case "claude_web": return `claude.ai 로그인${plan}`;
+    case "claude_code": return `Claude Code · ${a.source.credentials_path}`;
+    case "chatgpt_web": return `chatgpt.com 로그인 · Codex 한도${plan}`;
+    case "anthropic_admin": return "Anthropic Admin 키 · 이번 달 API 사용액";
+    case "openai_admin": return "OpenAI Admin 키 · 이번 달 API 사용액";
+    default: return "";
+  }
 }
 
 function renderSettings() {
@@ -189,6 +223,10 @@ function renderSettings() {
           <button data-action="remove" class="danger" title="삭제">삭제</button>
         </div>
         <div class="src" title="${esc(sourceText(a))}">${esc(sourceText(a))}</div>
+        ${isApi(a) ? `
+        <label class="budget">월 예산 $
+          <input type="number" min="0" step="1" value="${a.budget_usd ?? ""}" placeholder="없음" data-action="budget">
+        </label>` : ""}
       </li>`,
         )
         .join("")
@@ -239,8 +277,8 @@ async function call(cmd, args) {
   }
 }
 
-async function startLogin() {
-  await call("start_claude_login");
+async function startLogin(cmd = "start_claude_login") {
+  await call(cmd);
   toast("로그인 창이 열렸습니다. 로그인이 끝나면 자동으로 추가됩니다.");
 }
 
@@ -263,6 +301,7 @@ document.addEventListener("click", async (e) => {
   const id = btn.closest("li[data-id]")?.dataset.id;
   switch (btn.dataset.action) {
     case "login": return startLogin();
+    case "login-chatgpt": return startLogin("start_chatgpt_login");
     case "settings": return show("settings");
     case "up": return call("move_account", { id, delta: -1 });
     case "down": return call("move_account", { id, delta: 1 });
@@ -275,9 +314,12 @@ document.addEventListener("click", async (e) => {
 });
 
 document.addEventListener("change", (e) => {
+  const id = e.target.closest("li[data-id]")?.dataset.id;
   if (e.target.matches('[data-action="rename"]')) {
-    const id = e.target.closest("li[data-id]").dataset.id;
     call("rename_account", { id, label: e.target.value });
+  } else if (e.target.matches('[data-action="budget"]')) {
+    const v = Number(e.target.value);
+    call("set_budget", { id, budget: v > 0 ? v : null });
   }
 });
 
@@ -291,7 +333,30 @@ $("btn-settings").addEventListener("click", () => show(view === "settings" ? "us
 $("btn-back").addEventListener("click", () => show("usage"));
 $("btn-hide").addEventListener("click", () => window.__TAURI__.window.getCurrentWindow().hide());
 $("btn-quit").addEventListener("click", () => call("quit_app"));
-$("btn-login").addEventListener("click", startLogin);
+$("btn-login").addEventListener("click", () => startLogin());
+$("btn-login-chatgpt").addEventListener("click", () => startLogin("start_chatgpt_login"));
+
+$("btn-add-api").addEventListener("click", async () => {
+  const b = $("btn-add-api");
+  const budget = Number($("api-budget").value);
+  b.disabled = true;
+  b.textContent = "확인 중…";
+  try {
+    await call("add_api_key", {
+      provider: $("api-provider").value,
+      key: $("api-key").value,
+      label: $("api-label").value,
+      budget: budget > 0 ? budget : null,
+    });
+    $("api-key").value = "";
+    $("api-label").value = "";
+    $("api-budget").value = "";
+    toast("API 계정을 추가했습니다.");
+  } finally {
+    b.disabled = false;
+    b.textContent = "추가";
+  }
+});
 
 $("btn-add-key").addEventListener("click", async () => {
   const key = $("session-key").value.trim();

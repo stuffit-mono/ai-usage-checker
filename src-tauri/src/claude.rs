@@ -16,14 +16,27 @@ const OAUTH_USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 pub const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0";
 
-#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+/// 화면에 막대 하나로 그리는 한도(또는 사용액). Claude 외 서비스도 이 형태로 바꿔 쓴다.
+#[derive(Debug, Clone, Default, Serialize, serde::Deserialize)]
 pub struct Limit {
-    /// "session", "weekly", 또는 "model:<이름>"
+    /// "session", "weekly", "model:<이름>", "budget", "spend" 등
     pub key: String,
     pub label: String,
     pub percent: f64,
     pub resets_at: Option<DateTime<Utc>>,
+    /// 한도 구간 길이(초). 지난 시간 막대를 그릴 때 쓴다.
+    #[serde(default)]
+    pub window_secs: Option<i64>,
+    /// 퍼센트 대신 보여줄 값 (예: "$12.30 / $50")
+    #[serde(default)]
+    pub display: Option<String>,
+    /// 사용량 막대를 그리지 않는다 (예산 없는 사용액)
+    #[serde(default)]
+    pub no_bar: bool,
 }
+
+pub const SESSION_SECS: i64 = 5 * 3600;
+pub const WEEK_SECS: i64 = 7 * 24 * 3600;
 
 #[derive(Debug)]
 pub enum FetchError {
@@ -51,7 +64,7 @@ impl FetchError {
         match self {
             Self::Auth(m) => m.clone(),
             Self::RateLimited => "조회 요청이 너무 많아 잠시 쉬었다가 다시 시도합니다.".into(),
-            Self::Blocked => "claude.ai가 요청을 차단했습니다(Cloudflare). 잠시 후 다시 시도합니다.".into(),
+            Self::Blocked => "서버가 요청을 차단했습니다(Cloudflare). 잠시 후 다시 시도합니다.".into(),
             Self::Http(c) => format!("서버 오류 (HTTP {c})"),
             Self::Network(m) => format!("네트워크 오류: {m}"),
             Self::Parse(m) => format!("응답을 해석하지 못했습니다: {m}"),
@@ -59,7 +72,7 @@ impl FetchError {
     }
 }
 
-async fn get_json(req: RequestBuilder) -> Result<Value, FetchError> {
+pub(crate) async fn get_json(req: RequestBuilder) -> Result<Value, FetchError> {
     let res = req
         .send()
         .await
@@ -200,6 +213,15 @@ fn model_label(slug: &str) -> String {
     }
 }
 
+fn window_for(key: &str) -> Option<i64> {
+    match key {
+        "session" => Some(SESSION_SECS),
+        "weekly" => Some(WEEK_SECS),
+        k if k.starts_with("model:") => Some(WEEK_SECS),
+        _ => None,
+    }
+}
+
 /// 응답을 표시용 한도 목록으로 바꾼다. 두 번째 값은 추가 사용량(extra usage) 활성 여부.
 pub fn parse_usage(v: &Value) -> (Vec<Limit>, bool) {
     let mut out: Vec<Limit> = Vec::new();
@@ -218,7 +240,7 @@ pub fn parse_usage(v: &Value) -> (Vec<Limit>, bool) {
                 other if !other.is_empty() => (format!("other:{other}"), other.replace('_', " ")),
                 _ => continue,
             };
-            out.push(Limit { key, label, percent, resets_at });
+            out.push(Limit { window_secs: window_for(&key), key, label, percent, resets_at, ..Default::default() });
         }
     }
 
@@ -241,7 +263,7 @@ pub fn parse_usage(v: &Value) -> (Vec<Limit>, bool) {
                 }
                 _ => continue,
             };
-            out.push(Limit { key, label, percent, resets_at });
+            out.push(Limit { window_secs: window_for(&key), key, label, percent, resets_at, ..Default::default() });
         }
     }
 

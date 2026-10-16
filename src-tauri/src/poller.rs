@@ -1,6 +1,7 @@
 //! 주기적으로 모든 계정의 사용량을 조회하고, 한도 도달 예측(ETA)과 알림을 처리한다.
 
 use crate::claude::{self, FetchError, Limit};
+use crate::{billing, chatgpt};
 use crate::config::{self, Account, Settings, Source};
 use crate::AppState;
 use chrono::{DateTime, Duration, Utc};
@@ -27,6 +28,8 @@ pub struct AccountStatus {
     pub error: Option<String>,
     pub limits: Vec<LimitView>,
     pub extra_usage: bool,
+    /// 카드 머리에 붙이는 짧은 정보 (예: "크레딧 120")
+    pub badge: Option<String>,
     /// 마지막으로 성공한 조회 시각. 실패해도 이전 값을 유지한다.
     pub updated_at: Option<DateTime<Utc>>,
 }
@@ -77,18 +80,43 @@ pub async fn run(app: AppHandle) {
     }
 }
 
-async fn fetch(state: &AppState, account: &Account) -> Result<(Vec<Limit>, bool, Option<String>), FetchError> {
+/// 계정 하나의 조회 결과
+#[derive(Default)]
+struct Fetched {
+    limits: Vec<Limit>,
+    extra_usage: bool,
+    plan: Option<String>,
+    badge: Option<String>,
+    /// 토큰을 갱신했으면 새로 저장할 비밀값
+    new_secret: Option<String>,
+}
+
+async fn fetch(state: &AppState, account: &Account) -> Result<Fetched, FetchError> {
+    let secret = || config::get_secret(&account.id).map_err(FetchError::Auth);
     match &account.source {
         Source::ClaudeWeb { org_uuid } => {
-            let key = config::get_secret(&account.id).map_err(FetchError::Auth)?;
-            let v = claude::web_usage(&state.client, &key, org_uuid).await?;
-            let (limits, extra) = claude::parse_usage(&v);
-            Ok((limits, extra, None))
+            let v = claude::web_usage(&state.client, &secret()?, org_uuid).await?;
+            let (limits, extra_usage) = claude::parse_usage(&v);
+            Ok(Fetched { limits, extra_usage, ..Default::default() })
         }
         Source::ClaudeCode { credentials_path } => {
             let (v, plan) = claude::code_usage(&state.client, credentials_path).await?;
-            let (limits, extra) = claude::parse_usage(&v);
-            Ok((limits, extra, plan))
+            let (limits, extra_usage) = claude::parse_usage(&v);
+            Ok(Fetched { limits, extra_usage, plan, ..Default::default() })
+        }
+        Source::ChatgptWeb { .. } => {
+            let s = chatgpt::Secret::from_json(&secret()?)?;
+            let (v, updated) = chatgpt::usage(&state.client, &s).await?;
+            let (limits, plan, badge) = chatgpt::parse_usage(&v);
+            Ok(Fetched { limits, plan, badge, new_secret: updated.map(|u| u.to_json()), ..Default::default() })
+        }
+        Source::AnthropicAdmin => {
+            let spent = billing::anthropic_month_to_date(&state.client, &secret()?).await?;
+            Ok(Fetched { limits: vec![billing::spend_limit(spent, account.budget_usd)], ..Default::default() })
+        }
+        Source::OpenaiAdmin => {
+            let spent = billing::openai_month_to_date(&state.client, &secret()?).await?;
+            Ok(Fetched { limits: vec![billing::spend_limit(spent, account.budget_usd)], ..Default::default() })
         }
     }
 }
@@ -120,8 +148,11 @@ pub async fn refresh_all(app: &AppHandle) {
             let mut rt = state.runtime.lock().unwrap();
             let now = Utc::now();
             match result {
-                Ok((limits, extra, plan)) => {
+                Ok(Fetched { limits, extra_usage, plan, badge, new_secret }) => {
                     rt.backoff.remove(&account.id);
+                    if let Some(s) = new_secret {
+                        let _ = config::set_secret(&account.id, &s);
+                    }
                     if let Some(p) = plan {
                         if account.plan.as_deref() != Some(&p) {
                             let mut c = state.config.lock().unwrap();
@@ -162,7 +193,8 @@ pub async fn refresh_all(app: &AppHandle) {
                             error_kind: None,
                             error: None,
                             limits: views,
-                            extra_usage: extra,
+                            extra_usage,
+                            badge,
                             updated_at: Some(now),
                         },
                     );
@@ -183,6 +215,7 @@ pub async fn refresh_all(app: &AppHandle) {
                             error: Some(e.message()),
                             limits: prev.as_ref().map(|p| p.limits.clone()).unwrap_or_default(),
                             extra_usage: prev.as_ref().is_some_and(|p| p.extra_usage),
+                            badge: prev.as_ref().and_then(|p| p.badge.clone()),
                             updated_at: prev.and_then(|p| p.updated_at),
                         },
                     );

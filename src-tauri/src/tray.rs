@@ -94,7 +94,13 @@ pub fn update_tooltip(app: &AppHandle) {
         let fmt = |v: Option<f64>| v.map_or("-".to_string(), |v| format!("{v:.0}%"));
         let warn = if st.ok { "" } else { " ⚠" };
         let name: String = a.label.chars().take(16).collect();
-        lines.push(format!("{name}: 5h {} · 주 {}{warn}", fmt(session), fmt(weekly)));
+        if session.is_some() || weekly.is_some() {
+            lines.push(format!("{name}: 5h {} · 주 {}{warn}", fmt(session), fmt(weekly)));
+        } else if let Some(l) = st.limits.first() {
+            // API 계정: 이번 달 사용액
+            let v = l.limit.display.clone().unwrap_or_else(|| fmt(Some(l.limit.percent)));
+            lines.push(format!("{name}: {v}{warn}"));
+        }
     }
     // Windows 툴팁은 127자 제한
     let mut text = lines.join("\n");

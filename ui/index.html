@@ -31,9 +31,9 @@
       </section>
 
       <section class="panel">
-        <h2>계정 추가</h2>
+        <h2>Claude 구독 추가</h2>
         <button class="primary wide" id="btn-login">Claude 로그인으로 추가</button>
-        <p class="hint">로그인 창은 시크릿 모드라 계정마다 따로 로그인할 수 있습니다. 내장 창에서는 Google 로그인이 막힐 수 있으니 <b>이메일 인증 코드</b> 로그인을 권장합니다.</p>
+        <p class="hint">로그인 창은 시크릿 모드라 계정마다 따로 로그인할 수 있습니다. Google 로그인이 막히면 <b>이메일 인증 코드</b> 로그인을 쓰세요.</p>
 
         <details>
           <summary>sessionKey 직접 입력</summary>
@@ -53,6 +53,31 @@
           </div>
           <p class="hint">Claude Code CLI로 로그인한 경우 사용합니다. 파일은 읽기만 합니다.</p>
         </details>
+      </section>
+
+      <section class="panel">
+        <h2>ChatGPT 구독 추가</h2>
+        <button class="wide" id="btn-login-chatgpt">ChatGPT 로그인으로 추가</button>
+        <p class="hint">ChatGPT 요금제에 포함된 <b>Codex</b>의 5시간·주간 사용 한도를 보여줍니다. 일반 채팅 메시지 한도는 OpenAI가 조회 수단을 제공하지 않아 표시할 수 없습니다.</p>
+      </section>
+
+      <section class="panel">
+        <h2>API 사용액 추가</h2>
+        <div class="inline">
+          <select id="api-provider" aria-label="서비스">
+            <option value="anthropic">Claude API</option>
+            <option value="openai">OpenAI API</option>
+          </select>
+          <input type="text" id="api-label" placeholder="표시 이름 (선택)">
+        </div>
+        <div class="inline">
+          <input type="password" id="api-key" placeholder="Admin API 키" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="inline">
+          <input type="number" id="api-budget" min="0" step="1" placeholder="월 예산 $ (선택)">
+          <button id="btn-add-api">추가</button>
+        </div>
+        <p class="hint">일반 API 키가 아닌 <b>Admin 키</b>가 필요합니다 (Claude Console → Settings → Admin keys / OpenAI Platform → Organization → Admin keys). 남은 크레딧 잔액은 두 서비스 모두 API로 조회할 수 없어서 <b>이번 달 사용액</b>을 보여주고, 월 예산을 넣으면 예산 대비 비율과 알림을 줍니다.</p>
       </section>
 
       <section class="panel">
