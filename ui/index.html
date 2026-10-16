@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 사용량</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="shell">
+    <header data-tauri-drag-region>
+      <span class="title" data-tauri-drag-region>AI 사용량</span>
+      <span class="updated" id="updated" data-tauri-drag-region></span>
+      <button class="icon" id="btn-refresh" title="지금 새로고침" aria-label="지금 새로고침">
+        <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"/></svg>
+      </button>
+      <button class="icon" id="btn-settings" title="설정" aria-label="설정">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+      <button class="icon" id="btn-hide" title="숨기기 (트레이 아이콘으로 다시 열기)" aria-label="숨기기">
+        <svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg>
+      </button>
+    </header>
+
+    <main id="view-usage"></main>
+
+    <main id="view-settings" hidden>
+      <section class="panel">
+        <h2>계정</h2>
+        <ul id="account-list" class="account-list"></ul>
+      </section>
+
+      <section class="panel">
+        <h2>계정 추가</h2>
+        <button class="primary wide" id="btn-login">Claude 로그인으로 추가</button>
+        <p class="hint">로그인 창은 시크릿 모드라 계정마다 따로 로그인할 수 있습니다. 내장 창에서는 Google 로그인이 막힐 수 있으니 <b>이메일 인증 코드</b> 로그인을 권장합니다.</p>
+
+        <details>
+          <summary>sessionKey 직접 입력</summary>
+          <div class="inline">
+            <input type="password" id="session-key" placeholder="sk-ant-sid01-…" autocomplete="off" spellcheck="false">
+            <button id="btn-add-key">추가</button>
+          </div>
+          <p class="hint">브라우저에서 claude.ai 접속 → 개발자 도구(F12) → Application → Cookies → <code>sessionKey</code> 값</p>
+        </details>
+
+        <details>
+          <summary>Claude Code 인증 파일</summary>
+          <input type="text" id="cc-path" spellcheck="false">
+          <div class="inline">
+            <input type="text" id="cc-label" placeholder="표시 이름 (선택)">
+            <button id="btn-add-cc">추가</button>
+          </div>
+          <p class="hint">Claude Code CLI로 로그인한 경우 사용합니다. 파일은 읽기만 합니다.</p>
+        </details>
+      </section>
+
+      <section class="panel">
+        <h2>표시 · 알림</h2>
+        <label class="field">갱신 주기
+          <select id="set-interval">
+            <option value="60">1분</option>
+            <option value="180">3분</option>
+            <option value="300">5분</option>
+            <option value="600">10분</option>
+            <option value="1800">30분</option>
+          </select>
+        </label>
+        <label class="field">경고 알림 기준 <span><input type="number" id="set-warn" min="10" max="99" step="1">%</span></label>
+        <label class="field">위험 알림 기준 <span><input type="number" id="set-crit" min="10" max="100" step="1">%</span></label>
+        <label class="check"><input type="checkbox" id="set-notify"> 사용량 알림 받기</label>
+        <label class="check"><input type="checkbox" id="set-notify-reset"> 5시간 세션 초기화 알림</label>
+        <label class="check"><input type="checkbox" id="set-ontop"> 항상 위에 표시</label>
+        <label class="check"><input type="checkbox" id="set-autostart"> 로그인 시 자동 실행</label>
+      </section>
+
+      <section class="panel row-end">
+        <button id="btn-back" class="primary">완료</button>
+        <button id="btn-quit" class="danger">앱 종료</button>
+      </section>
+    </main>
+
+    <div id="toast" role="status" hidden></div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

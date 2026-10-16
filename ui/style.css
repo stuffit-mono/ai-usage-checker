@@ -1,0 +1,213 @@
+:root {
+  --bg: rgba(250, 249, 245, 0.97);
+  --surface: #ffffff;
+  --border: rgba(31, 30, 29, 0.12);
+  --text: #1f1e1d;
+  --muted: #73716c;
+  --track: rgba(31, 30, 29, 0.08);
+  --accent: #d97757;
+  --warn: #c98a12;
+  --crit: #d0443a;
+  --ok: #3f8f5a;
+  --time: #4f7fb8;
+  --input: #f4f3ee;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: rgba(31, 30, 29, 0.96);
+    --surface: #2a2927;
+    --border: rgba(255, 255, 255, 0.09);
+    --text: #f2f1ec;
+    --muted: #a3a19b;
+    --track: rgba(255, 255, 255, 0.09);
+    --warn: #e5a83a;
+    --crit: #ef6a5f;
+    --ok: #6cbf86;
+    --time: #7fa8db;
+    --input: #343330;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font: 13px/1.4 "Segoe UI Variable Text", "Segoe UI", "Malgun Gothic", -apple-system, "Apple SD Gothic Neo", system-ui, sans-serif;
+  color: var(--text);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  position: relative;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px 6px 14px;
+  cursor: default;
+}
+
+.title { font-weight: 600; font-size: 13px; }
+.updated { flex: 1; color: var(--muted); font-size: 11px; margin-left: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+button {
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button:disabled { opacity: 0.5; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger { color: var(--crit); }
+button.wide { width: 100%; padding: 8px; }
+button.link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; }
+
+button.icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 7px;
+  color: var(--muted);
+}
+button.icon:hover { background: var(--track); color: var(--text); }
+button.icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+button.icon.spinning svg { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+main { flex: 1; overflow-y: auto; padding: 2px 10px 12px; }
+main::-webkit-scrollbar { width: 6px; }
+main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 3px; }
+
+/* 사용량 카드 */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  padding: 10px 12px 11px;
+  margin-top: 8px;
+}
+.card.stale .limit { opacity: 0.55; }
+
+.card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.card-head .name { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge { font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); white-space: nowrap; }
+.badge.muted { background: var(--track); color: var(--muted); }
+
+.limit + .limit { margin-top: 9px; }
+.limit .row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.limit .lbl { color: var(--muted); font-size: 12px; }
+.limit .pct { font-weight: 600; font-variant-numeric: tabular-nums; }
+.limit.main .pct { font-size: 17px; }
+.limit.main .lbl { color: var(--text); font-weight: 500; }
+
+.bar { height: 6px; background: var(--track); border-radius: 3px; margin-top: 4px; }
+/* 지난 시간 막대: 사용량 막대와 같은 폭. 끝까지 차면 초기화된다. */
+.tbar { height: 4px; margin-top: 3px; background: var(--track); border-radius: 2px; overflow: hidden; }
+.tbar > i { display: block; height: 100%; background: var(--time); border-radius: inherit; transition: width 1s linear; }
+.tleft { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.tleft .clock { width: 12px; height: 12px; fill: none; stroke: var(--time); stroke-width: 2.2; stroke-linecap: round; }
+.tleft b { font-weight: 600; color: var(--time); }
+.tgroup.soon .tleft b { color: var(--ok); }
+.tgroup.soon .tleft .clock { stroke: var(--ok); }
+.tgroup.soon .tbar > i { background: var(--ok); }
+.limit.main .bar { height: 8px; border-radius: 4px; }
+.bar > i { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width 0.4s ease; }
+.lvl-warn .bar > i { background: var(--warn); }
+.lvl-crit .bar > i { background: var(--crit); }
+.lvl-warn .pct { color: var(--warn); }
+.lvl-crit .pct { color: var(--crit); }
+
+.sub { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 10px; margin-top: 4px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.eta.danger { color: var(--crit); font-weight: 500; }
+.eta.safe { color: var(--ok); }
+
+.models { margin-top: 9px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.models .limit + .limit { margin-top: 6px; }
+.models .bar { height: 4px; }
+
+.err { margin-top: 8px; font-size: 11.5px; color: var(--crit); display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.err button { padding: 2px 8px; font-size: 11.5px; flex-shrink: 0; }
+
+.empty { text-align: center; color: var(--muted); padding: 40px 12px; }
+.empty p { margin: 0 0 14px; }
+.empty .link { margin-top: 10px; }
+
+/* 설정 */
+.panel { margin-top: 10px; }
+.panel h2 { font-size: 11.5px; font-weight: 600; color: var(--muted); margin: 6px 2px 6px; }
+.hint { font-size: 11.5px; color: var(--muted); margin: 6px 2px 0; -webkit-user-select: text; user-select: text; }
+code { font-size: 11px; background: var(--track); padding: 0 4px; border-radius: 4px; }
+
+input[type="text"], input[type="password"], input[type="number"], select {
+  font: inherit;
+  color: inherit;
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px 8px;
+  width: 100%;
+  -webkit-user-select: text;
+  user-select: text;
+}
+input[type="number"] { width: 64px; text-align: right; }
+select { width: auto; }
+
+details { margin-top: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 7px 10px; }
+details[open] { padding-bottom: 10px; }
+summary { cursor: pointer; font-size: 12.5px; }
+details > input { margin-top: 8px; }
+.inline { display: flex; gap: 6px; margin-top: 8px; }
+.inline input { flex: 1; min-width: 0; }
+
+.field { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 2px; }
+.field span { display: flex; align-items: center; gap: 4px; }
+.check { display: flex; align-items: center; gap: 8px; padding: 5px 2px; cursor: pointer; }
+.check input { accent-color: var(--accent); margin: 0; }
+
+.account-list { list-style: none; margin: 0; padding: 0; }
+.account-list li { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 7px 8px; margin-bottom: 6px; }
+.account-list .top { display: flex; gap: 4px; align-items: center; }
+.account-list .top input { flex: 1; min-width: 0; padding: 3px 6px; }
+.account-list .top button { padding: 2px 7px; font-size: 12px; }
+.account-list .src { font-size: 11px; color: var(--muted); margin: 4px 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-list .none { color: var(--muted); font-size: 12px; padding: 4px 2px; background: none; border: 0; }
+
+.row-end { display: flex; justify-content: space-between; padding-bottom: 4px; }
+
+#toast {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+#toast.error { background: var(--crit); color: #fff; }
