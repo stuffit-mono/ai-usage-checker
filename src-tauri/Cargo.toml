@@ -1,6 +1,6 @@
 [package]
 name = "ai-usage-checker"
-version = "0.1.0"
+version = "0.2.0"
 description = "Claude / ChatGPT usage widget"
 edition = "2021"
 
@@ -28,6 +28,8 @@ fastrand = "2"
 base64 = "0.22"
 percent-encoding = "2"
 tauri-plugin-global-shortcut = "2"
+# zip 기능은 배포 중단된 zip 버전에 묶여 있어 끈다. Windows는 NSIS(.exe) 설치 파일로 업데이트하므로 필요 없다.
+tauri-plugin-updater = { version = "2.14", default-features = false, features = ["native-tls", "system-proxy"] }
 
 [profile.release]
 codegen-units = 1

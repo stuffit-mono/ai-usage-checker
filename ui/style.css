@@ -179,6 +179,10 @@ body.compact main { padding-bottom: 6px; }
 .cell .bar { width: 34px; height: 5px; margin-top: 0; }
 .cell .pct { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
 
+/* 새 버전 알림 */
+.update-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 10px 4px; padding: 6px 6px 6px 10px; border-radius: 9px; font-size: 12px; background: color-mix(in srgb, var(--accent) 14%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.update-bar button { padding: 3px 10px; font-size: 12px; }
+
 input.shortcut { width: 150px; text-align: center; cursor: pointer; caret-color: transparent; }
 input.shortcut:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .models .limit + .limit { margin-top: 6px; }

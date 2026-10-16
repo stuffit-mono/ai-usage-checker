@@ -228,7 +228,8 @@ function fitWindow() {
   }
   wasCompact = compact;
   if (!compact) return;
-  const need = document.querySelector("header").offsetHeight + $("view-usage").scrollHeight + 2;
+  const bar = $("update-bar").hidden ? 0 : $("update-bar").offsetHeight;
+  const need = document.querySelector("header").offsetHeight + bar + $("view-usage").scrollHeight + 2;
   if (Math.abs(window.innerHeight - need) > 2) invoke("fit_height", { height: need });
 }
 
@@ -539,9 +540,53 @@ listen("login-result", (e) => {
   }
 });
 
+// ---------- 앱 업데이트 ----------
+
+async function checkUpdate(silent) {
+  try {
+    const info = await invoke("check_update");
+    if (info) {
+      $("update-text").textContent = `새 버전 ${info.version}이 있습니다`;
+      $("update-bar").title = info.notes || "";
+      $("update-bar").hidden = false;
+      fitWindow();
+    } else if (!silent) {
+      toast("최신 버전입니다.");
+    }
+  } catch (e) {
+    // 자동 확인 실패(오프라인, 아직 릴리스 없음 등)는 조용히 넘긴다
+    if (!silent) toast(String(e), true);
+  }
+}
+
+$("btn-check-update").addEventListener("click", () => checkUpdate(false));
+
+$("btn-update").addEventListener("click", async () => {
+  const b = $("btn-update");
+  b.disabled = true;
+  $("update-text").textContent = "내려받는 중…";
+  try {
+    await invoke("install_update"); // 성공하면 앱이 다시 시작된다
+  } catch (e) {
+    toast(String(e), true);
+    $("update-text").textContent = "업데이트에 실패했습니다";
+    b.disabled = false;
+  }
+});
+
+listen("update-progress", (e) => {
+  const { received, total } = e.payload;
+  $("update-text").textContent = total
+    ? `내려받는 중… ${Math.min(100, Math.round((received / total) * 100))}%`
+    : `내려받는 중… ${(received / 1048576).toFixed(1)}MB`;
+});
+
 (async () => {
   $("cc-path").value = await invoke("default_claude_code_path");
+  $("app-version").textContent = await invoke("app_version");
   snap = await invoke("get_snapshot");
   render();
   setInterval(tick, 1000);
+  setTimeout(() => checkUpdate(true), 5000);
+  setInterval(() => checkUpdate(true), 6 * HOUR);
 })();

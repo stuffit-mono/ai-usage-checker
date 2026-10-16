@@ -5,6 +5,7 @@ mod config;
 mod poller;
 mod tray;
 mod tray_icon;
+mod update;
 
 use config::{Account, Config, Settings, Source};
 use poller::AccountStatus;
@@ -578,6 +579,7 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -657,6 +659,9 @@ pub fn run() {
             update_settings,
             set_autostart,
             fit_height,
+            update::app_version,
+            update::check_update,
+            update::install_update,
             refresh_now,
             quit_app,
         ])

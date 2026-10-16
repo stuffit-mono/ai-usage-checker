@@ -30,11 +30,27 @@ Claude · ChatGPT 구독 사용 한도와 API 사용액을 여러 계정에 걸�
 ```bash
 npm install
 npm run dev      # 개발 실행
-npm run build    # 설치 파일 생성 (src-tauri/target/release/bundle/)
 cd src-tauri && cargo test   # 응답 파싱 · ETA · 금액 계산 테스트
 ```
 
-macOS 빌드는 Mac에서 `npm run build`를 실행하면 `.dmg`가 만들어집니다.
+설치 파일은 업데이트 서명 키가 있어야 만들어집니다. 키는 `~/.tauri/ai-usage-checker.key`에 있습니다 (저장소에 넣지 말고 따로 백업하세요).
+
+```bash
+TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/ai-usage-checker.key)" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" npm run build
+```
+
+## 릴리스와 자동 업데이트
+
+앱은 6시간마다 `https://github.com/stuffit-mono/ai-usage-checker/releases/latest/download/latest.json`을 확인해서, 새 버전이 있으면 위젯 위쪽에 알림을 띄웁니다. 업데이트 파일은 서명을 검증한 뒤 설치합니다.
+
+새 버전을 내는 순서:
+
+1. `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`의 버전을 올리고 커밋
+2. `git tag v0.3.0` → `git push origin main --tags`
+3. GitHub Actions(`.github/workflows/release.yml`)가 Windows·macOS 설치 파일과 `latest.json`을 빌드해 **초안 릴리스**를 만듦
+4. GitHub의 Releases에서 초안을 확인하고 **Publish release**를 누르면 사용자 앱에 업데이트가 뜸
+
+처음 한 번은 저장소 Settings → Secrets and variables → Actions에 `TAURI_SIGNING_PRIVATE_KEY`(키 파일 내용)를 등록해야 합니다. macOS 빌드는 Apple 개발자 서명이 없어서, 처음 실행할 때 "확인되지 않은 개발자" 경고가 뜨면 우클릭 → 열기로 실행하세요.
 
 ## 구조
 
@@ -47,6 +63,8 @@ src-tauri/src/
   billing.rs        Anthropic / OpenAI Admin API 이번 달 사용액
   poller.rs         주기 조회, 한도 도달 예측, 알림, 기록(history.json)
   tray.rs           트레이 아이콘과 메뉴
+  tray_icon.rs      트레이 아이콘 이미지(사용률 숫자) 그리기
+  update.rs         앱 자동 업데이트
   config.rs         config.json과 OS 보안 저장소
 ```
 

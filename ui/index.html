@@ -25,6 +25,11 @@
       </button>
     </header>
 
+    <div id="update-bar" class="update-bar" hidden>
+      <span id="update-text"></span>
+      <button id="btn-update" class="primary">업데이트</button>
+    </div>
+
     <main id="view-usage"></main>
 
     <main id="view-settings" hidden>
@@ -106,6 +111,15 @@
         <p class="hint">칸을 누른 뒤 원하는 키 조합(예: Ctrl+Shift+U)을 누르세요. Backspace를 누르면 단축키를 끕니다.</p>
         <label class="check"><input type="checkbox" id="set-ontop"> 항상 위에 표시</label>
         <label class="check"><input type="checkbox" id="set-autostart"> 로그인 시 자동 실행</label>
+      </section>
+
+      <section class="panel">
+        <h2>앱 정보</h2>
+        <div class="field">
+          <span>버전 <b id="app-version">-</b></span>
+          <button id="btn-check-update">업데이트 확인</button>
+        </div>
+        <p class="hint">새 버전은 자동으로 확인하며(6시간마다), 있으면 위젯 위쪽에 알림이 나타납니다.</p>
       </section>
 
       <section class="panel row-end">
