@@ -40,11 +40,14 @@ function fmtAgo(iso) {
 
 // ---------- 사용량 화면 ----------
 
+/** 한도에 가까워질수록 파랑 → 초록 → 노랑 → 빨강. 노랑·빨강 기준은 설정의 알림 기준을 따른다. */
 function level(p) {
   const s = snap.settings;
+  const warn = s.warn_percent ?? 80;
   if (p >= (s.crit_percent ?? 95)) return "lvl-crit";
-  if (p >= (s.warn_percent ?? 80)) return "lvl-warn";
-  return "";
+  if (p >= warn) return "lvl-warn";
+  if (p >= Math.min(50, warn)) return "lvl-mid";
+  return "lvl-low";
 }
 
 const HOUR = 3_600_000;
