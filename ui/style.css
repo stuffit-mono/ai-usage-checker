@@ -36,6 +36,8 @@
 }
 
 * { box-sizing: border-box; }
+/* display를 지정한 요소(.update-bar 등)도 hidden이면 반드시 숨긴다 */
+[hidden] { display: none !important; }
 
 html, body {
   margin: 0;

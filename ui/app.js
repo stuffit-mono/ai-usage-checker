@@ -566,7 +566,14 @@ $("btn-update").addEventListener("click", async () => {
   b.disabled = true;
   $("update-text").textContent = "내려받는 중…";
   try {
-    await invoke("install_update"); // 성공하면 앱이 다시 시작된다
+    // 설치에 성공하면 앱이 다시 시작된다. false면 이미 최신 버전이다.
+    const installed = await invoke("install_update");
+    if (installed === false) {
+      $("update-bar").hidden = true;
+      b.disabled = false;
+      fitWindow();
+      toast("이미 최신 버전입니다.");
+    }
   } catch (e) {
     toast(String(e), true);
     $("update-text").textContent = "업데이트에 실패했습니다";

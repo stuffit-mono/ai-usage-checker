@@ -37,15 +37,18 @@ pub async fn check_update(app: AppHandle) -> Result<Option<UpdateInfo>, String> 
 }
 
 /// 새 버전을 내려받아 설치하고 앱을 다시 시작한다. 진행률은 `update-progress` 이벤트로 알린다.
+/// 그사이 새 버전이 없어졌으면(이미 최신) false를 돌려준다.
 #[tauri::command]
-pub async fn install_update(app: AppHandle) -> Result<(), String> {
-    let update = app
+pub async fn install_update(app: AppHandle) -> Result<bool, String> {
+    let Some(update) = app
         .updater()
         .map_err(|e| e.to_string())?
         .check()
         .await
         .map_err(|e| format!("업데이트를 확인하지 못했습니다: {e}"))?
-        .ok_or("설치할 새 버전이 없습니다.")?;
+    else {
+        return Ok(false);
+    };
 
     let progress_app = app.clone();
     let mut received = 0usize;
