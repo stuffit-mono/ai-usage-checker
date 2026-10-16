@@ -1,6 +1,7 @@
 //! 트레이(Windows) / 메뉴바(macOS) 아이콘과 메뉴.
 
-use crate::AppState;
+use crate::{tray_icon, AppState};
+use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, Wry};
@@ -74,23 +75,31 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// 툴팁에 계정별 요약을, macOS 메뉴바에는 가장 높은 세션 사용률을 표시한다.
+/// 툴팁에 계정별 요약을, 아이콘(macOS는 메뉴바 글자도)에 가장 높은 5시간 사용률을 표시한다.
+/// 5시간 한도가 있는 계정이 없으면 가장 높은 주간 사용률을 쓴다.
 pub fn update_tooltip(app: &AppHandle) {
     let Some(tray) = app.tray_by_id("main") else { return };
     let state = app.state::<AppState>();
-    let accounts = state.config.lock().unwrap().accounts.clone();
+    let (accounts, settings) = {
+        let c = state.config.lock().unwrap();
+        (c.accounts.clone(), c.settings.clone())
+    };
     let rt = state.runtime.lock().unwrap();
 
+    let max = |acc: Option<f64>, v: Option<f64>| match (acc, v) {
+        (Some(a), Some(b)) => Some(a.max(b)),
+        (a, b) => a.or(b),
+    };
     let mut lines = vec!["AI 사용량".to_string()];
     let mut max_session: Option<f64> = None;
+    let mut max_weekly: Option<f64> = None;
     for a in &accounts {
         let Some(st) = rt.statuses.get(&a.id) else { continue };
         let pick = |k: &str| st.limits.iter().find(|l| l.limit.key == k).map(|l| l.limit.percent);
         let session = pick("session");
         let weekly = pick("weekly");
-        if let Some(s) = session {
-            max_session = Some(max_session.map_or(s, |m: f64| m.max(s)));
-        }
+        max_session = max(max_session, session);
+        max_weekly = max(max_weekly, weekly);
         let fmt = |v: Option<f64>| v.map_or("-".to_string(), |v| format!("{v:.0}%"));
         let warn = if st.ok { "" } else { " ⚠" };
         let name: String = a.label.chars().take(16).collect();
@@ -108,8 +117,20 @@ pub fn update_tooltip(app: &AppHandle) {
         text = text.chars().take(119).collect::<String>() + "…";
     }
     let _ = tray.set_tooltip(Some(text));
+
+    let shown = if settings.tray_percent { max_session.or(max_weekly) } else { None };
+    let icon = match shown {
+        Some(p) => Image::new_owned(
+            tray_icon::render(p, settings.warn_percent, settings.crit_percent),
+            tray_icon::SIZE,
+            tray_icon::SIZE,
+        ),
+        None => match app.default_window_icon() {
+            Some(i) => i.clone(),
+            None => return,
+        },
+    };
+    let _ = tray.set_icon(Some(icon));
     #[cfg(target_os = "macos")]
-    let _ = tray.set_title(max_session.map(|s| format!("{s:.0}%")));
-    #[cfg(not(target_os = "macos"))]
-    let _ = max_session;
+    let _ = tray.set_title(shown.map(|s| format!("{s:.0}%")));
 }

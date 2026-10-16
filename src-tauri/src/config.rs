@@ -42,6 +42,8 @@ pub struct Settings {
     pub always_on_top: bool,
     pub notifications: bool,
     pub notify_reset: bool,
+    /// 트레이 아이콘에 가장 높은 사용률을 숫자로 표시
+    pub tray_percent: bool,
 }
 
 impl Default for Settings {
@@ -53,6 +55,7 @@ impl Default for Settings {
             always_on_top: true,
             notifications: true,
             notify_reset: true,
+            tray_percent: true,
         }
     }
 }

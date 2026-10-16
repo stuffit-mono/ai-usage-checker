@@ -4,6 +4,7 @@ mod claude;
 mod config;
 mod poller;
 mod tray;
+mod tray_icon;
 
 use config::{Account, Config, Settings, Source};
 use poller::AccountStatus;
@@ -504,6 +505,8 @@ fn update_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
     s.crit_percent = s.crit_percent.clamp(s.warn_percent, 100.0);
     mutate_config(&app, |c| c.settings = s)?;
     set_always_on_top(&app, on_top);
+    // 아이콘 표시 여부나 색 기준이 바뀌었을 수 있다
+    tray::update_tooltip(&app);
     Ok(())
 }
 

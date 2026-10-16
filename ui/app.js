@@ -243,6 +243,7 @@ function renderSettings() {
   setIfIdle("set-crit", s.crit_percent);
   $("set-notify").checked = s.notifications;
   $("set-notify-reset").checked = s.notify_reset;
+  $("set-tray-percent").checked = s.tray_percent ?? true;
   $("set-ontop").checked = s.always_on_top;
   $("set-autostart").checked = snap.autostart;
 }
@@ -293,6 +294,7 @@ function saveSettings() {
     crit_percent: Number($("set-crit").value) || 95,
     notifications: $("set-notify").checked,
     notify_reset: $("set-notify-reset").checked,
+    tray_percent: $("set-tray-percent").checked,
     always_on_top: $("set-ontop").checked,
   };
   call("update_settings", { settings: s });
@@ -381,7 +383,7 @@ $("btn-add-cc").addEventListener("click", async () => {
   toast("Claude Code 계정을 추가했습니다.");
 });
 
-for (const id of ["set-interval", "set-warn", "set-crit", "set-notify", "set-notify-reset", "set-ontop"]) {
+for (const id of ["set-interval", "set-warn", "set-crit", "set-notify", "set-notify-reset", "set-tray-percent", "set-ontop"]) {
   $(id).addEventListener("change", saveSettings);
 }
 $("set-autostart").addEventListener("change", (e) => call("set_autostart", { enabled: e.target.checked }));
