@@ -63,13 +63,24 @@ function windowMs(l) {
 const MAIN_KEYS = ["session", "weekly", "budget", "spend"];
 
 const SERVICES = {
-  claude_web: { name: "Claude", cls: "svc-claude" },
-  claude_code: { name: "Claude", cls: "svc-claude" },
-  chatgpt_web: { name: "ChatGPT", cls: "svc-chatgpt" },
-  anthropic_admin: { name: "Claude API", cls: "svc-api" },
-  openai_admin: { name: "OpenAI API", cls: "svc-api" },
+  claude_web: { name: "Claude", cls: "svc-claude", logo: "claude" },
+  claude_code: { name: "Claude", cls: "svc-claude", logo: "claude" },
+  chatgpt_web: { name: "ChatGPT", cls: "svc-chatgpt", logo: "openai" },
+  anthropic_admin: { name: "Claude API", cls: "svc-api", logo: "claude" },
+  openai_admin: { name: "OpenAI API", cls: "svc-api", logo: "openai" },
 };
+
+/** 서비스 로고 SVG (ui/logos.js). 색은 글자색(currentColor)을 따른다. */
+function logoSvg(svc) {
+  const d = svc && LOGO_PATHS[svc.logo];
+  if (!d) return "";
+  const rule = svc.logo === "openai" ? "evenodd" : "nonzero";
+  return `<svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="${rule}" d="${d}"/></svg>`;
+}
 const isApi = (a) => a.source.kind === "anthropic_admin" || a.source.kind === "openai_admin";
+
+/** 초기화 시점을 나타내는 깃발 (깃대 왼쪽, 천 오른쪽) */
+const FLAG_ICON = `<svg class="flag" viewBox="0 0 16 16" aria-hidden="true"><path class="pole" d="M3.5 1.5v13"/><path class="cloth" d="M4 2h8l-2 3 2 3H4z"/></svg>`;
 
 const CLOCK_ICON = `<svg class="clock" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`;
 
@@ -89,7 +100,10 @@ function limitHtml(l, main) {
   if (main && win) {
     time = `
       <div class="tgroup" data-tbar="${esc(l.resets_at)}" data-win="${win}">
-        <div class="tbar"><i></i></div>
+        <div class="journey" title="초기화까지의 여정: 점이 깃발에 닿으면 초기화">
+          <div class="road"><i class="done"></i><b class="dot"></b></div>
+          ${FLAG_ICON}
+        </div>
         <div class="sub">
           <span class="tleft">${CLOCK_ICON}<b></b><span class="at" data-reset-at="${esc(l.resets_at)}"></span></span>
           ${eta}
@@ -146,7 +160,7 @@ function cardHtml(a) {
   return `
     <section class="card ${st && !st.ok ? "stale" : ""}">
       <div class="card-head">
-        <span class="svc ${svc.cls}">${esc(svc.name)}</span>
+        <span class="svc ${svc.cls}">${logoSvg(svc)}${esc(svc.name)}</span>
         <span class="name" title="${esc(a.label)}">${esc(a.label)}</span>${badges}
       </div>
       ${body}${trendHtml(st?.trend)}${err}
@@ -211,33 +225,37 @@ function compactRowHtml(a) {
   const warn = st && !st.ok ? `<span class="warn" title="${esc(st.error)}">⚠</span>` : "";
   return `
     <section class="crow ${st && !st.ok ? "stale" : ""}">
-      <span class="svc ${svc.cls}" title="${esc(svc.name)}">${esc(svc.name.slice(0, 1))}</span>
+      <span class="svc ${svc.cls}" title="${esc(svc.name)}">${logoSvg(svc)}</span>
       <span class="name" title="${esc(a.label)}">${esc(a.label)}</span>${warn}
       <div class="cells">${cells || `<span class="sub">불러오는 중…</span>`}</div>
     </section>`;
 }
 
-/** 미니 모드에서 창 높이를 내용에 맞춘다. 전체 모드로 돌아갈 때 쓸 높이는 따로 기억한다. */
-let wasCompact = false;
+/** 지금 보이는 화면 내용 전체의 높이(px). 창이 내용보다 커도 정확히 잰다. */
+function contentHeight() {
+  const main = view === "usage" ? $("view-usage") : $("view-settings");
+  const last = main.lastElementChild;
+  // offsetTop은 .shell 기준이고 스크롤과 무관하다
+  const bottom = last ? last.offsetTop + last.offsetHeight : main.offsetTop;
+  const pad = parseFloat(getComputedStyle(main).paddingBottom) || 0;
+  return Math.ceil(Math.min(bottom + pad + 2, window.screen.availHeight * 0.9));
+}
+
+/** 창이 내용보다 길어지지 않게 한다.
+ *  - 최대 높이는 항상 내용 높이로 묶는다(더 늘릴 수 없음)
+ *  - 미니 모드이거나, 직전에 내용에 딱 맞춰져 있었으면 내용이 바뀔 때 함께 늘고 준다
+ *  - 사용자가 일부러 줄여 둔 창은 그대로 두고 스크롤로 본다 */
+let lastNeed = 0;
 
 function fitWindow() {
-  const compact = !!snap.settings.compact && view === "usage";
-  if (compact && !wasCompact && window.innerHeight > 300) localSet("fullHeight", window.innerHeight);
-  if (!compact && wasCompact) {
-    invoke("fit_height", { height: Number(localGet("fullHeight")) || 560 });
-  }
-  wasCompact = compact;
-  if (!compact) return;
-  const bar = $("update-bar").hidden ? 0 : $("update-bar").offsetHeight;
-  const need = document.querySelector("header").offsetHeight + bar + $("view-usage").scrollHeight + 2;
-  if (Math.abs(window.innerHeight - need) > 2) invoke("fit_height", { height: need });
-}
-
-function localGet(k) {
-  try { return localStorage.getItem(k); } catch { return null; }
-}
-function localSet(k, v) {
-  try { localStorage.setItem(k, String(v)); } catch { /* 저장 못 해도 동작에는 지장 없음 */ }
+  requestAnimationFrame(() => {
+    const need = contentHeight();
+    if (need === lastNeed) return;
+    const fitted = lastNeed === 0 || Math.abs(window.innerHeight - lastNeed) <= 3;
+    const resize = fitted || (snap.settings.compact && view === "usage");
+    lastNeed = need;
+    invoke("fit_height", { height: need, resize });
+  });
 }
 
 function renderUsage() {
@@ -273,8 +291,10 @@ function tick() {
   document.querySelectorAll("[data-tbar]").forEach((e) => {
     const left = new Date(e.dataset.tbar) - now;
     const elapsed = 1 - Math.max(0, Math.min(1, left / Number(e.dataset.win)));
-    e.querySelector(".tbar > i").style.width = `${elapsed * 100}%`;
-    e.querySelector(".tbar").title = `지난 시간 ${Math.round(elapsed * 100)}% — 막대 끝에 도달하면 초기화`;
+    // 점이 길을 따라 깃발(초기화 시점)로 다가간다. 지나온 길은 실선, 남은 길은 점선.
+    e.querySelector(".road .done").style.width = `${elapsed * 100}%`;
+    e.querySelector(".road .dot").style.left = `${elapsed * 100}%`;
+    e.querySelector(".journey").title = `구간의 ${Math.round(elapsed * 100)}% 지남 — 점이 깃발에 닿으면 초기화`;
     e.querySelector(".tleft b").textContent = left > 0 ? `${fmtDuration(left)} 남음` : "초기화 중";
     // 구간의 90% 이상 지났으면 "곧 초기화"로 강조
     e.classList.toggle("soon", elapsed >= 0.9);

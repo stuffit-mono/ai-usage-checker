@@ -119,11 +119,13 @@ main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 3px; }
 .card.stale .limit { opacity: 0.55; }
 
 .card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-.svc { font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
+.svc { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.01em; white-space: nowrap; }
+.svc .logo { width: 14px; height: 14px; flex-shrink: 0; }
 .svc-claude { color: var(--accent); }
 .svc-chatgpt { color: var(--chatgpt); }
 .svc-api { color: var(--muted); }
-.card-head .name { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 계정 이름(이메일)은 서비스 이름보다 작고 흐리게 */
+.card-head .name { font-size: 11.5px; font-weight: 500; color: var(--muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badge { font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); white-space: nowrap; }
 .badge.muted { background: var(--track); color: var(--muted); }
 
@@ -135,10 +137,20 @@ main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 3px; }
 .limit.main .lbl { color: var(--text); font-weight: 500; }
 
 .bar { height: 6px; background: var(--track); border-radius: 3px; margin-top: 4px; }
-/* 지난 시간 막대: 사용량 막대와 같은 폭. 끝까지 차면 초기화된다. */
-.tbar { height: 4px; margin-top: 3px; background: var(--track); border-radius: 2px; overflow: hidden; }
-/* 지난 시간 막대는 사용량 색(파랑~빨강)과 겹치지 않도록 무채색으로 둔다 */
-.tbar > i { display: block; height: 100%; background: var(--time); border-radius: inherit; transition: width 1s linear; }
+/* 초기화까지의 여정: 사용량 막대와 같은 폭의 길 위에서 점이 오른쪽 끝 깃발로 다가간다.
+   지나온 길은 실선, 남은 길은 점선. 사용량 색(파랑~빨강)과 겹치지 않게 무채색으로 그린다. */
+/* 깃발이 막대와 겹치지 않도록 높이를 두고, 길은 아래쪽(깃대 밑동 높이)에 둔다 */
+.journey { position: relative; height: 15px; margin-top: 5px; }
+/* 깃발 천 끝이 막대 오른쪽 끝과 맞도록, 길은 깃대 위치(천 폭 6.4px 앞)에서 끝난다 */
+.road { position: absolute; left: 0; right: 6.4px; top: 12px; }
+.road::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; border-top: 2px dotted var(--time); }
+.road .done { position: absolute; left: 0; top: -1px; height: 2px; background: var(--muted); border-radius: 1px; transition: width 1s linear; }
+.road .dot { position: absolute; top: -4px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 2px var(--surface); transition: left 1s linear; }
+/* 12px 깃발: 깃대는 아이콘 왼쪽 2.6px, 천 끝은 9px 지점. 천 끝을 막대 오른쪽 끝에 맞춘다 */
+.journey .flag { position: absolute; right: -3px; top: 1.1px; width: 12px; height: 12px; }
+.flag .pole { stroke: var(--text); stroke-width: 1.5; stroke-linecap: round; opacity: 0.8; }
+.flag .cloth { fill: var(--text); opacity: 0.8; }
+.tgroup.soon .flag .cloth, .tgroup.soon .road .dot { fill: var(--ok); background: var(--ok); }
 .tleft { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .tleft .clock { width: 12px; height: 12px; fill: none; stroke: var(--muted); stroke-width: 2.2; stroke-linecap: round; }
 .tleft b { font-weight: 600; color: var(--text); }
@@ -172,7 +184,8 @@ main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 3px; }
 body.compact main { padding-bottom: 6px; }
 .crow { display: flex; align-items: center; gap: 6px; padding: 5px 8px; margin-top: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
 .crow.stale .cells { opacity: 0.55; }
-.crow .svc { width: 14px; text-align: center; flex-shrink: 0; }
+.crow .svc { width: 15px; justify-content: center; flex-shrink: 0; }
+.crow .svc .logo { width: 15px; height: 15px; }
 .crow .name { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crow .warn { color: var(--crit); font-size: 12px; }
 .cells { display: flex; gap: 8px; flex-shrink: 0; }

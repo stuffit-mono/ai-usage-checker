@@ -1,5 +1,6 @@
 //! 트레이(Windows) / 메뉴바(macOS) 아이콘과 메뉴.
 
+use crate::config::Source;
 use crate::{tray_icon, AppState};
 use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
@@ -86,20 +87,24 @@ pub fn update_tooltip(app: &AppHandle) {
     };
     let rt = state.runtime.lock().unwrap();
 
-    let max = |acc: Option<f64>, v: Option<f64>| match (acc, v) {
-        (Some(a), Some(b)) => Some(a.max(b)),
-        (a, b) => a.or(b),
+    // (사용률, 그 계정의 서비스 대표색) 중 사용률이 가장 높은 것
+    type Peak = Option<(f64, [u8; 3])>;
+    let max = |acc: Peak, v: Option<f64>, svc: [u8; 3]| match (acc, v) {
+        (Some(a), Some(b)) if b > a.0 => Some((b, svc)),
+        (None, Some(b)) => Some((b, svc)),
+        (a, _) => a,
     };
     let mut lines = vec!["AI 사용량".to_string()];
-    let mut max_session: Option<f64> = None;
-    let mut max_weekly: Option<f64> = None;
+    let mut max_session: Peak = None;
+    let mut max_weekly: Peak = None;
     for a in &accounts {
         let Some(st) = rt.statuses.get(&a.id) else { continue };
         let pick = |k: &str| st.limits.iter().find(|l| l.limit.key == k).map(|l| l.limit.percent);
         let session = pick("session");
         let weekly = pick("weekly");
-        max_session = max(max_session, session);
-        max_weekly = max(max_weekly, weekly);
+        let svc = service_color(&a.source);
+        max_session = max(max_session, session, svc);
+        max_weekly = max(max_weekly, weekly, svc);
         let fmt = |v: Option<f64>| v.map_or("-".to_string(), |v| format!("{v:.0}%"));
         let warn = if st.ok { "" } else { " ⚠" };
         let name: String = a.label.chars().take(16).collect();
@@ -120,8 +125,8 @@ pub fn update_tooltip(app: &AppHandle) {
 
     let shown = if settings.tray_percent { max_session.or(max_weekly) } else { None };
     let icon = match shown {
-        Some(p) => Image::new_owned(
-            tray_icon::render(p, settings.warn_percent, settings.crit_percent),
+        Some((p, svc)) => Image::new_owned(
+            tray_icon::render(p, svc, settings.warn_percent, settings.crit_percent),
             tray_icon::SIZE,
             tray_icon::SIZE,
         ),
@@ -132,5 +137,13 @@ pub fn update_tooltip(app: &AppHandle) {
     };
     let _ = tray.set_icon(Some(icon));
     #[cfg(target_os = "macos")]
-    let _ = tray.set_title(shown.map(|s| format!("{s:.0}%")));
+    let _ = tray.set_title(shown.map(|(s, _)| format!("{s:.0}%")));
+}
+
+/// 트레이 아이콘 배경에 쓰는 서비스 대표색
+fn service_color(source: &Source) -> [u8; 3] {
+    match source {
+        Source::ChatgptWeb { .. } | Source::OpenaiAdmin => tray_icon::CHATGPT_RGB,
+        _ => tray_icon::CLAUDE_RGB,
+    }
 }

@@ -48,13 +48,13 @@ impl Canvas {
         self.px[i..i + 4].copy_from_slice(&rgba);
     }
 
-    /// 모서리가 둥근 사각형으로 아이콘 전체를 채운다.
-    fn rounded_bg(&mut self, rgb: [u8; 3], radius: i32) {
-        let s = SIZE as i32;
-        for y in 0..s {
-            for x in 0..s {
-                let cx = if x < radius { radius } else if x >= s - radius { s - radius - 1 } else { x };
-                let cy = if y < radius { radius } else if y >= s - radius { s - radius - 1 } else { y };
+    /// (inset, inset)부터 안쪽을 모서리가 둥근 사각형으로 채운다. inset 0이면 아이콘 전체.
+    fn rounded_rect(&mut self, rgb: [u8; 3], inset: i32, radius: i32) {
+        let (lo, hi) = (inset, SIZE as i32 - inset);
+        for y in lo..hi {
+            for x in lo..hi {
+                let cx = x.clamp(lo + radius, hi - radius - 1);
+                let cy = y.clamp(lo + radius, hi - radius - 1);
                 let (dx, dy) = (x - cx, y - cy);
                 if dx * dx + dy * dy <= radius * radius {
                     self.set(x, y, [rgb[0], rgb[1], rgb[2], 255]);
@@ -90,12 +90,25 @@ fn ink_for(bg: [u8; 3]) -> [u8; 4] {
     }
 }
 
+/// 서비스 대표색 (Claude 주황, ChatGPT 초록)
+pub const CLAUDE_RGB: [u8; 3] = [0xd9, 0x77, 0x57];
+pub const CHATGPT_RGB: [u8; 3] = [0x10, 0xa3, 0x7f];
+/// 경고·위험 단계일 때 아이콘 둘레에 두르는 테두리 두께(px)
+const RING: i32 = 4;
+
 /// 사용률(%)을 그린 32x32 RGBA 픽셀. 100% 이상이면 "!"를 그린다.
-pub fn render(percent: f64, warn: f64, crit: f64) -> Vec<u8> {
+/// 배경은 서비스 대표색이고, 경고 기준 이상이면 둘레를 노랑(경고)·빨강(위험) 테두리로 감싼다.
+pub fn render(percent: f64, service: [u8; 3], warn: f64, crit: f64) -> Vec<u8> {
     let mut c = Canvas::new();
-    let bg = level_color(percent, warn, crit);
-    let ink = ink_for(bg);
-    c.rounded_bg(bg, 7);
+    let ink = ink_for(service);
+    if percent >= warn {
+        // 테두리와 배경 사이에 1px 어두운 선을 넣어 비슷한 색(주황 배경·빨강 테두리)도 구분되게 한다
+        c.rounded_rect(level_color(percent, warn, crit), 0, 7);
+        c.rounded_rect([0x1f, 0x1e, 0x1d], RING - 1, 5);
+        c.rounded_rect(service, RING, 4);
+    } else {
+        c.rounded_rect(service, 0, 7);
+    }
 
     let p = percent.round().max(0.0) as u32;
     let glyphs: Vec<&[u8; 7]> = if p >= 100 {
@@ -138,15 +151,24 @@ mod tests {
     }
 
     #[test]
-    fn draws_background_corners_and_digits() {
-        let px = render(42.0, 80.0, 95.0);
+    fn service_background_and_digits() {
+        let px = render(42.0, CLAUDE_RGB, 80.0, 95.0);
         assert_eq!(px.len(), (SIZE * SIZE * 4) as usize);
-        // 모서리는 투명, 가장자리 중앙은 배경색
+        // 모서리는 투명, 가장자리 중앙은 서비스 색 (경고 전이라 테두리 없음)
         assert_eq!(pixel(&px, 0, 0)[3], 0);
-        assert_eq!(pixel(&px, 16, 1), [0x3d, 0x7f, 0xd9, 255]);
+        assert_eq!(pixel(&px, 16, 1), [0xd9, 0x77, 0x57, 255]);
         // 흰 픽셀(숫자)이 있어야 한다
         let white = px.chunks(4).filter(|p| p == &[255, 255, 255, 255]).count();
         assert!(white > 40);
+    }
+
+    #[test]
+    fn warning_adds_level_ring() {
+        let px = render(85.0, CHATGPT_RGB, 80.0, 95.0);
+        assert_eq!(pixel(&px, 16, 1), [0xe8, 0xb2, 0x1a, 255]); // 노랑 테두리
+        assert_eq!(pixel(&px, 16, 5), [0x10, 0xa3, 0x7f, 255]); // 안쪽은 서비스 색
+        let px = render(97.0, CLAUDE_RGB, 80.0, 95.0);
+        assert_eq!(pixel(&px, 16, 1), [0xe0, 0x4f, 0x45, 255]); // 빨강 테두리
     }
 
     /// 아이콘 모양을 눈으로 확인할 때만 실행: `ICON_DUMP_DIR=경로 cargo test dump_icons -- --ignored`
@@ -154,21 +176,15 @@ mod tests {
     #[ignore]
     fn dump_icons() {
         let dir = std::env::var("ICON_DUMP_DIR").expect("ICON_DUMP_DIR 필요");
-        for p in [7.0, 25.0, 61.0, 84.0, 97.0, 100.0] {
-            std::fs::write(format!("{dir}/icon_{p}.rgba"), render(p, 80.0, 95.0)).unwrap();
+        let cases = [(7.0, CLAUDE_RGB), (25.0, CHATGPT_RGB), (61.0, CLAUDE_RGB), (84.0, CHATGPT_RGB), (97.0, CLAUDE_RGB), (100.0, CHATGPT_RGB)];
+        for (p, svc) in cases {
+            std::fs::write(format!("{dir}/icon_{p}.rgba"), render(p, svc, 80.0, 95.0)).unwrap();
         }
     }
 
     #[test]
-    fn yellow_uses_dark_ink() {
-        let px = render(85.0, 80.0, 95.0);
-        assert!(px.chunks(4).any(|p| p == [0x1f, 0x1e, 0x1d, 255]));
-        assert!(!px.chunks(4).any(|p| p == [255, 255, 255, 255]));
-    }
-
-    #[test]
     fn full_usage_shows_bang() {
-        let px = render(100.0, 80.0, 95.0);
+        let px = render(100.0, CLAUDE_RGB, 80.0, 95.0);
         let white = px.chunks(4).filter(|p| p == &[255, 255, 255, 255]).count();
         // "!"는 6칸 × 3×3 = 54픽셀
         assert_eq!(white, 54);

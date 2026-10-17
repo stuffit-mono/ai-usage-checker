@@ -71,3 +71,7 @@ src-tauri/src/
 ## 주의
 
 구독 사용량 엔드포인트는 비공식입니다 (claude.ai `/api/organizations/{org}/usage`, `/api/oauth/usage`, chatgpt.com `/backend-api/wham/usage`). 응답 형식이 바뀌면 `claude.rs`·`chatgpt.rs`의 `parse_usage`만 고치면 되도록 분리해 두었습니다.
+
+## 출처
+
+- 서비스 로고(`ui/logos.js`): [Lobe Icons](https://github.com/lobehub/lobe-icons) (MIT 라이선스). Claude, ChatGPT/OpenAI 로고와 상표는 각 회사의 것입니다.

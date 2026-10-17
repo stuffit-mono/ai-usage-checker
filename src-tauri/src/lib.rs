@@ -547,14 +547,22 @@ fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// 미니 모드에서 위젯 높이를 내용에 맞춘다 (너비는 그대로).
+/// 위젯 창이 내용보다 길어지지 않게 최대 높이를 내용 높이로 묶는다(너비는 그대로).
+/// `resize`가 true면 창 높이도 내용에 맞춘다.
 #[tauri::command]
-fn fit_height(app: AppHandle, height: f64) -> Result<(), String> {
+fn fit_height(app: AppHandle, height: f64, resize: bool) -> Result<(), String> {
     let w = app.get_webview_window("main").ok_or("위젯 창을 찾지 못했습니다.")?;
     let scale = w.scale_factor().map_err(|e| e.to_string())?;
     let size = w.inner_size().map_err(|e| e.to_string())?.to_logical::<f64>(scale);
-    w.set_size(tauri::LogicalSize::new(size.width, height.clamp(120.0, 1200.0)))
-        .map_err(|e| e.to_string())
+    let h = height.clamp(80.0, 1400.0);
+    w.set_min_size(Some(tauri::LogicalSize::new(280.0, 80.0_f64.min(h))))
+        .map_err(|e| e.to_string())?;
+    w.set_max_size(Some(tauri::LogicalSize::new(10_000.0, h)))
+        .map_err(|e| e.to_string())?;
+    if resize || size.height > h + 1.0 {
+        w.set_size(tauri::LogicalSize::new(size.width, h)).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
