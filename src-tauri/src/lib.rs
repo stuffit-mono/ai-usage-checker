@@ -1,3 +1,4 @@
+mod about;
 mod billing;
 mod chatgpt;
 mod claude;
@@ -587,6 +588,7 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(
@@ -668,6 +670,7 @@ pub fn run() {
             set_autostart,
             fit_height,
             update::app_version,
+            about::open_link,
             update::check_update,
             update::install_update,
             refresh_now,

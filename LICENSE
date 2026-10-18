@@ -1,0 +1,16 @@
+Copyright (c) 2026 a_lonely_designer <lonelydesigners@gmail.com>
+All rights reserved.
+
+이 소프트웨어와 소스 코드의 저작권은 a_lonely_designer에게 있습니다.
+배포된 설치 파일을 내려받아 개인 또는 업무 목적으로 사용하는 것은 허용되지만,
+저작권자의 서면 허락 없이 소스 코드의 전부 또는 일부를 복제·수정·재배포하거나
+다른 제품에 포함할 수 없습니다.
+
+이 소프트웨어는 "있는 그대로" 제공되며, 사용으로 인해 생기는 어떠한 손해에 대해서도
+저작권자는 책임지지 않습니다.
+
+이 소프트웨어가 사용하는 오픈소스 구성 요소는 각자의 라이선스(MIT, Apache-2.0 등)를 따르며,
+그 고지는 저장소의 THIRD_PARTY_NOTICES.md에 있습니다.
+
+Claude는 Anthropic의, ChatGPT는 OpenAI의 상표입니다. 이 소프트웨어는 두 회사와 관련이 없는
+비공식 도구입니다.

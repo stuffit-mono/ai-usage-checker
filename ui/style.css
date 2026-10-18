@@ -194,6 +194,14 @@ body.compact main { padding-bottom: 6px; }
 .cell .bar { width: 34px; height: 5px; margin-top: 0; }
 .cell .pct { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
 
+/* 앱 정보: 개발자·연락처·저작권 */
+.about { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 10px 2px 0; font-size: 12px; }
+.about dt { color: var(--muted); }
+.about dd { margin: 0; text-align: right; -webkit-user-select: text; user-select: text; }
+.about .link { font-size: 12px; }
+.about .sns { display: block; font-size: 10.5px; color: var(--muted); }
+.copyright { margin: 10px 2px 0; font-size: 11.5px; font-weight: 600; text-align: center; color: var(--muted); }
+
 /* 새 버전 알림 */
 .update-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 10px 4px; padding: 6px 6px 6px 10px; border-radius: 9px; font-size: 12px; background: color-mix(in srgb, var(--accent) 14%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
 .update-bar button { padding: 3px 10px; font-size: 12px; }

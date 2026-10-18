@@ -75,3 +75,7 @@ src-tauri/src/
 ## 출처
 
 - 서비스 로고(`ui/logos.js`): [Lobe Icons](https://github.com/lobehub/lobe-icons) (MIT 라이선스). Claude, ChatGPT/OpenAI 로고와 상표는 각 회사의 것입니다.
+
+## 저작권
+
+© 2026 a_lonely_designer (lonelydesigners@gmail.com). All rights reserved. 사용 조건은 [LICENSE](LICENSE)를, 사용한 오픈소스의 고지는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)를 보세요.

@@ -580,6 +580,8 @@ async function checkUpdate(silent) {
 }
 
 $("btn-check-update").addEventListener("click", () => checkUpdate(false));
+$("btn-email").addEventListener("click", () => call("open_link", { kind: "email" }));
+$("btn-repo").addEventListener("click", () => call("open_link", { kind: "repo" }));
 
 $("btn-update").addEventListener("click", async () => {
   const b = $("btn-update");
