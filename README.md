@@ -14,12 +14,12 @@ Claude · ChatGPT 구독 사용 한도와 API 사용액을 여러 계정에 걸�
 |---|---|---|
 | **Claude Pro/Max** | 5시간 세션, 주간, 모델별 주간 한도 | Claude 로그인 창 (권장), sessionKey 붙여넣기, Claude Code 인증 파일 |
 | **ChatGPT Plus/Pro** | Codex 5시간·주간 한도, 크레딧 | ChatGPT 로그인 창 |
-| **Claude API** | 이번 달 API 사용액 (월 예산 대비 %) | Anthropic Admin 키 |
-| **OpenAI API** | 이번 달 API 사용액 (월 예산 대비 %) | OpenAI Admin 키 |
+| **Claude API** | 남은 크레딧(입력 시), 이번 달 API 사용액 (월 예산 대비 %) | Anthropic Admin 키 |
+| **OpenAI API** | 남은 크레딧(입력 시), 이번 달 API 사용액 (월 예산 대비 %) | OpenAI Admin 키 |
 
 - 로그인 창은 시크릿 모드라 계정마다 따로 로그인할 수 있고, Google 등 소셜 로그인 팝업도 지원합니다.
 - ChatGPT의 일반 채팅 메시지 한도는 OpenAI가 조회 수단을 제공하지 않아 표시할 수 없습니다.
-- API 선불 크레딧 잔액은 Anthropic·OpenAI 모두 API로 제공하지 않아 이번 달(UTC) 사용액을 보여줍니다.
+- API 선불 크레딧 잔액은 Anthropic·OpenAI 모두 API로 제공하지 않습니다. 지금 남은 크레딧을 한 번 입력하면 그 뒤 사용액을 빼서 잔액과 소진 예상 시점을 보여주고, 입력하지 않으면 이번 달(UTC) 사용액만 보여줍니다.
 
 로그인 정보와 키는 OS 보안 저장소(Windows 자격 증명 관리자 / macOS 키체인)에 `ai-usage-checker` 이름으로 저장되며, 각 서비스의 서버로만 전송됩니다. 로그인이 만료되면 카드에 **다시 로그인** 버튼이 나타납니다.
 

@@ -31,6 +31,19 @@ pub struct Account {
     /// API 계정의 월 예산(USD). 있으면 예산 대비 비율과 알림을 보여준다.
     #[serde(default)]
     pub budget_usd: Option<f64>,
+    /// API 계정의 남은 크레딧 기준값. 이후 사용액을 빼서 남은 크레딧을 계산한다.
+    #[serde(default)]
+    pub credit: Option<Credit>,
+}
+
+/// 사용자가 입력한 남은 크레딧과 그 시점의 기준 정보.
+/// 비용 API는 하루 단위로만 집계되므로, 입력한 날(UTC) 0시부터 입력 시각까지 이미 쓴 금액을
+/// `baseline_spent`로 기억해 두고 이후 계산에서 빼서 이중으로 차감하지 않는다.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Credit {
+    pub balance: f64,
+    pub set_at: chrono::DateTime<chrono::Utc>,
+    pub baseline_spent: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

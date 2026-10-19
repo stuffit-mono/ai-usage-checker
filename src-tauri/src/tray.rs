@@ -111,9 +111,10 @@ pub fn update_tooltip(app: &AppHandle) {
         if session.is_some() || weekly.is_some() {
             lines.push(format!("{name}: 5h {} · 주 {}{warn}", fmt(session), fmt(weekly)));
         } else if let Some(l) = st.limits.first() {
-            // API 계정: 이번 달 사용액
+            // API 계정: 남은 크레딧(입력했으면) 또는 이번 달 사용액
             let v = l.limit.display.clone().unwrap_or_else(|| fmt(Some(l.limit.percent)));
-            lines.push(format!("{name}: {v}{warn}"));
+            let what = if l.limit.key == "credit" { "잔액" } else { "이번 달" };
+            lines.push(format!("{name}: {what} {v}{warn}"));
         }
     }
     // Windows 툴팁은 127자 제한

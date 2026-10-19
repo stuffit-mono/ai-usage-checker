@@ -147,13 +147,22 @@ async fn fetch(state: &AppState, account: &Account) -> Result<Fetched, FetchErro
             let (limits, plan, badge) = chatgpt::parse_usage(&v);
             Ok(Fetched { limits, plan, badge, new_secret: updated.map(|u| u.to_json()), ..Default::default() })
         }
-        Source::AnthropicAdmin => {
-            let spent = billing::anthropic_month_to_date(&state.client, &secret()?).await?;
-            Ok(Fetched { limits: vec![billing::spend_limit(spent, account.budget_usd)], ..Default::default() })
-        }
-        Source::OpenaiAdmin => {
-            let spent = billing::openai_month_to_date(&state.client, &secret()?).await?;
-            Ok(Fetched { limits: vec![billing::spend_limit(spent, account.budget_usd)], ..Default::default() })
+        Source::AnthropicAdmin | Source::OpenaiAdmin => {
+            let provider = if matches!(account.source, Source::AnthropicAdmin) {
+                billing::Provider::Anthropic
+            } else {
+                billing::Provider::Openai
+            };
+            // 이번 달 1일과 크레딧 입력일 중 이른 날부터 한 번에 받아 두 값을 함께 계산한다
+            let month = billing::month_start(Utc::now());
+            let start = account.credit.as_ref().map_or(month, |c| c.set_at.min(month));
+            let daily = billing::daily_costs(&state.client, provider, &secret()?, start).await?;
+            let mut limits = Vec::new();
+            if let Some(c) = &account.credit {
+                limits.push(billing::credit_limit(c, &daily));
+            }
+            limits.push(billing::spend_limit(billing::sum_since(&daily, month), account.budget_usd));
+            Ok(Fetched { limits, ..Default::default() })
         }
     }
 }
@@ -205,6 +214,8 @@ pub async fn refresh_all(app: &AppHandle) {
                             let lookback = match l.key.as_str() {
                                 "session" => Some(Duration::minutes(45)),
                                 "weekly" => Some(Duration::hours(24)),
+                                // 크레딧은 하루 단위로만 집계되므로 최근 3일 속도로 소진 시점을 본다
+                                "credit" => Some(Duration::days(3)),
                                 _ => None,
                             };
                             let (eta, safe) = match lookback {

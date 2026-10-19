@@ -127,6 +127,7 @@ async fn add_from_session_key(app: &AppHandle, raw: &str) -> Result<usize, Strin
                         source: Source::ClaudeWeb { org_uuid: org.uuid.clone() },
                         plan: org.plan.clone(),
                         budget_usd: None,
+                        credit: None,
                     });
                     added += 1;
                     id
@@ -295,6 +296,7 @@ fn add_chatgpt_account(app: &AppHandle, info: chatgpt::SessionInfo, cookies: Str
                     source: Source::ChatgptWeb { account_id: account_id.clone() },
                     plan: info.plan.clone(),
                     budget_usd: None,
+                    credit: None,
                 });
                 (id, 1)
             }
@@ -378,6 +380,27 @@ async fn start_chatgpt_login(app: AppHandle) -> Result<(), String> {
 }
 
 /// Admin API 키를 확인(이번 달 사용액 조회)한 뒤 API 계정으로 추가한다.
+/// 남은 크레딧의 기준값을 만든다. 입력한 날(UTC) 0시부터 지금까지 이미 쓴 금액을 함께 기억한다.
+async fn make_credit(
+    client: &reqwest::Client,
+    provider: billing::Provider,
+    key: &str,
+    balance: f64,
+) -> Result<config::Credit, String> {
+    let now = chrono::Utc::now();
+    let daily = billing::daily_costs(client, provider, key, now).await.map_err(|e| e.message())?;
+    Ok(config::Credit { balance, set_at: now, baseline_spent: billing::sum_since(&daily, now) })
+}
+
+fn provider_of(source: &Source) -> Option<billing::Provider> {
+    match source {
+        Source::AnthropicAdmin => Some(billing::Provider::Anthropic),
+        Source::OpenaiAdmin => Some(billing::Provider::Openai),
+        _ => None,
+    }
+}
+
+/// Admin API 키를 확인(이번 달 사용액 조회)한 뒤 API 계정으로 추가한다. 남은 크레딧을 함께 넣을 수 있다.
 #[tauri::command]
 async fn add_api_key(
     app: AppHandle,
@@ -385,6 +408,7 @@ async fn add_api_key(
     key: String,
     label: String,
     budget: Option<f64>,
+    credit: Option<f64>,
 ) -> Result<(), String> {
     let key = key.trim().to_string();
     if key.is_empty() {
@@ -392,15 +416,18 @@ async fn add_api_key(
     }
     let state = app.state::<AppState>();
     let (source, default_label) = match provider.as_str() {
-        "anthropic" => {
-            billing::anthropic_month_to_date(&state.client, &key).await.map_err(|e| e.message())?;
-            (Source::AnthropicAdmin, "Claude API")
-        }
-        "openai" => {
-            billing::openai_month_to_date(&state.client, &key).await.map_err(|e| e.message())?;
-            (Source::OpenaiAdmin, "OpenAI API")
-        }
+        "anthropic" => (Source::AnthropicAdmin, "Claude API"),
+        "openai" => (Source::OpenaiAdmin, "OpenAI API"),
         _ => return Err("알 수 없는 서비스입니다.".into()),
+    };
+    let p = provider_of(&source).unwrap();
+    // 키 확인을 겸해 이번 달 사용액을 한 번 조회한다
+    billing::daily_costs(&state.client, p, &key, billing::month_start(chrono::Utc::now()))
+        .await
+        .map_err(|e| e.message())?;
+    let credit = match credit.filter(|c| *c > 0.0) {
+        Some(b) => Some(make_credit(&state.client, p, &key, b).await?),
+        None => None,
     };
     let id = uuid::Uuid::new_v4().to_string();
     config::set_secret(&id, &key)?;
@@ -412,8 +439,45 @@ async fn add_api_key(
             source,
             plan: None,
             budget_usd: budget.filter(|b| *b > 0.0),
+            credit,
         })
     })?;
+    state.wake.notify_one();
+    Ok(())
+}
+
+/// API 계정의 남은 크레딧을 입력(또는 비움)한다. 충전했을 때 새 잔액을 다시 넣으면 된다.
+#[tauri::command]
+async fn set_credit(app: AppHandle, id: String, balance: Option<f64>) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let source = state
+        .config
+        .lock()
+        .unwrap()
+        .accounts
+        .iter()
+        .find(|a| a.id == id)
+        .map(|a| a.source.clone())
+        .ok_or("계정을 찾지 못했습니다.")?;
+    let provider = provider_of(&source).ok_or("API 계정에서만 크레딧을 설정할 수 있습니다.")?;
+    let credit = match balance.filter(|b| *b > 0.0) {
+        Some(b) => {
+            let key = config::get_secret(&id)?;
+            Some(make_credit(&state.client, provider, &key, b).await?)
+        }
+        None => None,
+    };
+    mutate_config(&app, |c| {
+        if let Some(a) = c.accounts.iter_mut().find(|a| a.id == id) {
+            a.credit = credit;
+        }
+    })?;
+    {
+        // 이전 잔액 기준의 소진 속도 기록은 버린다
+        let mut rt = state.runtime.lock().unwrap();
+        rt.history.remove(&format!("{id}|credit"));
+        rt.marks.remove(&format!("{id}|credit"));
+    }
     state.wake.notify_one();
     Ok(())
 }
@@ -456,6 +520,7 @@ fn add_claude_code(app: AppHandle, path: String, label: String) -> Result<(), St
             source: Source::ClaudeCode { credentials_path: path },
             plan: None,
             budget_usd: None,
+            credit: None,
         })
     })?;
     app.state::<AppState>().wake.notify_one();
@@ -660,6 +725,7 @@ pub fn run() {
             start_chatgpt_login,
             add_api_key,
             set_budget,
+            set_credit,
             add_session_key,
             default_claude_code_path,
             add_claude_code,

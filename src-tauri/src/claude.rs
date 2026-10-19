@@ -33,6 +33,9 @@ pub struct Limit {
     /// 사용량 막대를 그리지 않는다 (예산 없는 사용액)
     #[serde(default)]
     pub no_bar: bool,
+    /// 막대 아래에 보여줄 보조 설명 (예: "10/19 입력한 $50.00에서 $12.80 사용")
+    #[serde(default)]
+    pub note: Option<String>,
 }
 
 pub const SESSION_SECS: i64 = 5 * 3600;

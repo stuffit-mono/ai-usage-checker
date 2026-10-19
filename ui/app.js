@@ -60,7 +60,7 @@ function windowMs(l) {
   return null;
 }
 
-const MAIN_KEYS = ["session", "weekly", "budget", "spend"];
+const MAIN_KEYS = ["credit", "session", "weekly", "budget", "spend"];
 
 const SERVICES = {
   claude_web: { name: "Claude", cls: "svc-claude", logo: "claude" },
@@ -88,9 +88,11 @@ function limitHtml(l, main) {
   const p = Math.max(0, Math.min(100, l.percent));
   const win = l.resets_at ? windowMs(l) : null;
   let eta = "";
+  // 크레딧은 "한도 도달" 대신 "소진"으로 말한다
+  const credit = l.key === "credit";
   if (main) {
-    if (l.percent >= 100) eta = `<span class="eta danger">한도 도달</span>`;
-    else if (l.eta) eta = `<span class="eta danger" data-eta="${esc(l.eta)}"></span>`;
+    if (l.percent >= 100) eta = `<span class="eta danger">${credit ? "크레딧 소진" : "한도 도달"}</span>`;
+    else if (l.eta) eta = `<span class="eta danger" data-eta="${esc(l.eta)}" data-verb="${credit ? "소진" : "한도"}"></span>`;
     else if (l.safe_until_reset) eta = `<span class="eta safe">초기화 전 한도 도달 안 함</span>`;
   }
 
@@ -109,9 +111,10 @@ function limitHtml(l, main) {
           ${eta}
         </div>
       </div>`;
-  } else if (l.resets_at || eta) {
+  } else if (l.resets_at || l.note || eta) {
     const reset = l.resets_at ? `<span data-reset="${esc(l.resets_at)}"></span>` : "";
-    time = `<div class="sub">${reset}${eta}</div>`;
+    const note = l.note ? `<span>${esc(l.note)}</span>` : "";
+    time = `<div class="sub">${reset}${note}${eta}</div>`;
   }
 
   const value = l.display ?? `${Math.round(l.percent)}%`;
@@ -201,7 +204,7 @@ function trendHtml(t) {
 }
 
 /** 미니 모드 한 줄에 쓰는 짧은 이름 */
-const SHORT = { session: "5h", weekly: "주", budget: "월", spend: "월" };
+const SHORT = { credit: "잔액", session: "5h", weekly: "주", budget: "월", spend: "월" };
 
 /** 미니 모드: 계정당 한 줄 (이름 + 주요 한도 2개) */
 function compactRowHtml(a) {
@@ -301,7 +304,7 @@ function tick() {
   });
   document.querySelectorAll("[data-eta]").forEach((e) => {
     const t = new Date(e.dataset.eta);
-    e.textContent = `이 속도면 ${fmtDuration(t - now)} 후 한도`;
+    e.textContent = `이 속도면 ${fmtDuration(t - now)} 후 ${e.dataset.verb || "한도"}`;
     e.title = `예상 도달 시각 ${fmtClock(t)}`;
   });
   const times = Object.values(snap.statuses).map((s) => s.updated_at).filter(Boolean).sort();
@@ -337,6 +340,11 @@ function renderSettings() {
         </div>
         <div class="src" title="${esc(sourceText(a))}">${esc(sourceText(a))}</div>
         ${isApi(a) ? `
+        <label class="budget" title="지금 남은 크레딧을 넣으면 이후 사용액을 빼서 계산합니다. 충전하면 새 잔액을 다시 넣으세요.">
+          남은 크레딧 $
+          <input type="number" min="0" step="0.01" value="${a.credit ? a.credit.balance : ""}" placeholder="입력 안 함" data-action="credit">
+        </label>
+        ${a.credit ? `<div class="credit-when">${fmtClock(new Date(a.credit.set_at))}에 입력한 값 기준</div>` : ""}
         <label class="budget">월 예산 $
           <input type="number" min="0" step="1" value="${a.budget_usd ?? ""}" placeholder="없음" data-action="budget">
         </label>` : ""}
@@ -375,6 +383,10 @@ function render() {
   const sc = snap.settings.shortcut;
   $("btn-hide").title = `숨기기 (트레이 아이콘${sc ? ` 또는 ${prettyShortcut(sc)}` : ""}로 다시 열기)`;
   $("btn-compact").title = snap.settings.compact ? "전체 보기로 전환" : "미니 모드로 전환";
+  const pinned = !!snap.settings.always_on_top;
+  $("btn-pin").classList.toggle("on", pinned);
+  $("btn-pin").setAttribute("aria-pressed", String(pinned));
+  $("btn-pin").title = pinned ? "항상 위에 표시 끄기" : "항상 위에 표시";
 }
 
 function show(v) {
@@ -448,6 +460,11 @@ document.addEventListener("change", (e) => {
   } else if (e.target.matches('[data-action="budget"]')) {
     const v = Number(e.target.value);
     call("set_budget", { id, budget: v > 0 ? v : null });
+  } else if (e.target.matches('[data-action="credit"]')) {
+    const v = Number(e.target.value);
+    call("set_credit", { id, balance: v > 0 ? v : null }).then(() =>
+      toast(v > 0 ? `남은 크레딧을 $${v.toFixed(2)}로 설정했습니다.` : "남은 크레딧 계산을 껐습니다."),
+    );
   }
 });
 
@@ -467,6 +484,7 @@ $("btn-login-chatgpt").addEventListener("click", () => startLogin("start_chatgpt
 $("btn-add-api").addEventListener("click", async () => {
   const b = $("btn-add-api");
   const budget = Number($("api-budget").value);
+  const credit = Number($("api-credit").value);
   b.disabled = true;
   b.textContent = "확인 중…";
   try {
@@ -475,10 +493,12 @@ $("btn-add-api").addEventListener("click", async () => {
       key: $("api-key").value,
       label: $("api-label").value,
       budget: budget > 0 ? budget : null,
+      credit: credit > 0 ? credit : null,
     });
     $("api-key").value = "";
     $("api-label").value = "";
     $("api-budget").value = "";
+    $("api-credit").value = "";
     toast("API 계정을 추가했습니다.");
   } finally {
     b.disabled = false;
@@ -504,6 +524,10 @@ $("btn-add-cc").addEventListener("click", async () => {
   await call("add_claude_code", { path: $("cc-path").value, label: $("cc-label").value });
   $("cc-label").value = "";
   toast("Claude Code 계정을 추가했습니다.");
+});
+
+$("btn-pin").addEventListener("click", () => {
+  call("update_settings", { settings: { ...snap.settings, always_on_top: !snap.settings.always_on_top } });
 });
 
 $("btn-compact").addEventListener("click", () => {

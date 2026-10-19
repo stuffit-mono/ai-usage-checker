@@ -17,6 +17,9 @@
       <button class="icon" id="btn-compact" title="미니 모드" aria-label="미니 모드 전환">
         <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
+      <button class="icon" id="btn-pin" title="항상 위에 표시" aria-label="항상 위에 표시" aria-pressed="false">
+        <svg viewBox="0 0 24 24"><path d="M9 3h6l-1 6 4 4H6l4-4z"/><path d="M12 13v8"/></svg>
+      </button>
       <button class="icon" id="btn-settings" title="설정" aria-label="설정">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
       </button>
@@ -82,10 +85,11 @@
           <input type="password" id="api-key" placeholder="Admin API 키" autocomplete="off" spellcheck="false">
         </div>
         <div class="inline">
-          <input type="number" id="api-budget" min="0" step="1" placeholder="월 예산 $ (선택)">
+          <input type="number" id="api-credit" min="0" step="0.01" placeholder="남은 크레딧 $">
+          <input type="number" id="api-budget" min="0" step="1" placeholder="월 예산 $">
           <button id="btn-add-api">추가</button>
         </div>
-        <p class="hint">일반 API 키가 아닌 <b>Admin 키</b>가 필요합니다 (Claude Console → Settings → Admin keys / OpenAI Platform → Organization → Admin keys). 남은 크레딧 잔액은 두 서비스 모두 API로 조회할 수 없어서 <b>이번 달 사용액</b>을 보여주고, 월 예산을 넣으면 예산 대비 비율과 알림을 줍니다.</p>
+        <p class="hint">일반 API 키가 아닌 <b>Admin 키</b>가 필요합니다 (Claude Console → Settings → Admin keys / OpenAI Platform → Organization → Admin keys). 남은 크레딧은 API로 조회할 수 없어서, 지금 남은 금액을 <b>한 번 입력</b>하면 그 뒤 사용액을 빼서 계산합니다(선택). 충전하면 새 잔액을 다시 입력하세요. 월 예산을 넣으면 이번 달 사용액의 비율과 알림을 보여줍니다(선택).</p>
       </section>
 
       <section class="panel">
