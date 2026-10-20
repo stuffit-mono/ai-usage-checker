@@ -79,6 +79,24 @@ function logoSvg(svc) {
 }
 const isApi = (a) => a.source.kind === "anthropic_admin" || a.source.kind === "openai_admin";
 
+/** 남은 시간 길의 눈금: 5시간 세션은 1시간마다, 주간 한도는 하루마다. 그 밖의 구간은 눈금 없음 */
+function roadTicks(win) {
+  let unit = null;
+  let title = "";
+  if (win && win <= 6 * HOUR) {
+    unit = HOUR;
+    title = " · 눈금 1칸 = 1시간";
+  } else if (win && win >= 6 * 24 * HOUR && win <= 8 * 24 * HOUR) {
+    unit = 24 * HOUR;
+    title = " · 눈금 1칸 = 하루";
+  }
+  if (!unit) return { html: "", title: "" };
+  const count = Math.round(win / unit);
+  const marks = [];
+  for (let k = 1; k < count; k++) marks.push(`<s style="left:${(k / count) * 100}%"></s>`);
+  return { html: marks.join(""), title };
+}
+
 /** 초기화 시점을 나타내는 깃발 (깃대 왼쪽, 천 오른쪽) */
 const FLAG_ICON = `<svg class="flag" viewBox="0 0 16 16" aria-hidden="true"><path class="pole" d="M3.5 1.5v13"/><path class="cloth" d="M4 2h8l-2 3 2 3H4z"/></svg>`;
 
@@ -99,11 +117,12 @@ function limitHtml(l, main) {
   // 주요 한도는 사용량 막대 바로 아래에 같은 폭의 "지난 시간" 막대를 둔다.
   // 두 막대를 위아래로 비교하면 시간보다 빨리 쓰고 있는지 바로 보인다.
   let time = "";
+  const ticks = roadTicks(win);
   if (main && win) {
     time = `
       <div class="tgroup" data-tbar="${esc(l.resets_at)}" data-win="${win}">
-        <div class="journey" title="초기화까지의 여정: 점이 깃발에 닿으면 초기화">
-          <div class="road"><i class="done"></i><b class="dot"></b></div>
+        <div class="journey" data-hint="${ticks.title}">
+          <div class="road"><i class="done"></i>${ticks.html}<b class="dot"></b></div>
           ${FLAG_ICON}
         </div>
         <div class="sub">
@@ -312,7 +331,8 @@ function tick() {
     // 점이 길을 따라 깃발(초기화 시점)로 다가간다. 지나온 길은 실선, 남은 길은 점선.
     e.querySelector(".road .done").style.width = `${elapsed * 100}%`;
     e.querySelector(".road .dot").style.left = `${elapsed * 100}%`;
-    e.querySelector(".journey").title = `구간의 ${Math.round(elapsed * 100)}% 지남 — 점이 깃발에 닿으면 초기화`;
+    const j = e.querySelector(".journey");
+    j.title = `구간의 ${Math.round(elapsed * 100)}% 지남 — 점이 깃발에 닿으면 초기화${j.dataset.hint || ""}`;
     e.querySelector(".tleft b").textContent = left > 0 ? `${fmtDuration(left)} 남음` : "초기화 중";
     // 구간의 90% 이상 지났으면 "곧 초기화"로 강조
     e.classList.toggle("soon", elapsed >= 0.9);

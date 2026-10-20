@@ -151,6 +151,8 @@ main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 3px; }
 .road { position: absolute; left: 0; right: 6.4px; top: 12px; }
 .road::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; border-top: 2px dotted var(--time); }
 .road .done { position: absolute; left: 0; top: -1px; height: 2px; background: var(--muted); border-radius: 1px; transition: width 1s linear; }
+/* 길 위의 눈금(1시간 또는 하루 단위). 점보다 뒤, 길보다 위에 또렷하게 */
+.road s { position: absolute; top: -4px; width: 2px; height: 8px; margin-left: -1px; border-radius: 1px; background: var(--muted); opacity: 0.85; text-decoration: none; }
 .road .dot { position: absolute; top: -4px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 2px var(--surface); transition: left 1s linear; }
 /* 12px 깃발: 깃대는 아이콘 왼쪽 2.6px, 천 끝은 9px 지점. 천 끝을 막대 오른쪽 끝에 맞춘다 */
 .journey .flag { position: absolute; right: -3px; top: 1.1px; width: 12px; height: 12px; }

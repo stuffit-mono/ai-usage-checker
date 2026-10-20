@@ -1,7 +1,7 @@
 {
   "name": "ai-usage-checker",
   "private": true,
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Claude / ChatGPT 사용량을 보여주는 데스크톱 위젯",
   "author": "a_lonely_designer <lonelydesigners@gmail.com>",
   "license": "UNLICENSED",
