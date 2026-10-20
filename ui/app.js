@@ -148,6 +148,22 @@ function limitHtml(l, main) {
     </div>`;
 }
 
+/** 5시간 한도와 주간 한도의 관계: 5시간 100%가 주간 몇 %인지, 남은 주간으로 5시간 한도를 몇 번 더 채울 수 있는지 */
+function ratioHtml(st, limits) {
+  const r = st?.weekly_per_session;
+  const weekly = limits.find((l) => l.key === "weekly");
+  if (!r || !weekly) return "";
+  const pct = r < 10 ? r.toFixed(1) : Math.round(r);
+  const left = Math.max(0, 100 - weekly.percent);
+  const times = left / r;
+  const timesText = times >= 20 ? "20회 이상" : times < 1 ? "1회 미만" : `${times.toFixed(1)}회`;
+  const tip = "최근 7일 기록에서 5시간 사용률이 오를 때 주간 사용률이 함께 오른 비율로 계산합니다. 사용하는 모델과 작업에 따라 달라질 수 있습니다.";
+  return `
+    <div class="ratio" title="${esc(tip)}">
+      <span>5시간 100% ≈ 주간 <b>${pct}%</b></span><span>남은 주간 ≈ 5시간 <b>${timesText}</b></span>
+    </div>`;
+}
+
 /** 로그인이 만료됐을 때 "다시 로그인" 버튼이 할 동작 */
 const RELOGIN = { claude_web: "login", chatgpt_web: "login-chatgpt" };
 
@@ -168,7 +184,7 @@ function cardHtml(a) {
   if (!st) {
     body = `<div class="sub">불러오는 중…</div>`;
   } else {
-    body = primary.map((l) => limitHtml(l, true)).join("");
+    body = primary.map((l) => limitHtml(l, true)).join("") + ratioHtml(st, limits);
     if (others.length) body += `<div class="models">${others.map((l) => limitHtml(l, false)).join("")}</div>`;
     if (!limits.length && st.ok) body = `<div class="sub">표시할 한도 정보가 없습니다.</div>`;
   }

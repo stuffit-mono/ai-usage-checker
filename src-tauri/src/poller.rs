@@ -32,6 +32,8 @@ pub struct AccountStatus {
     pub badge: Option<String>,
     /// 최근 7일 사용률 추이 (5시간 한도, 없으면 주간 한도)
     pub trend: Option<Trend>,
+    /// 5시간 한도 100%를 쓸 때 주간 한도가 몇 %p 줄어드는지 (최근 7일 기록으로 계산)
+    pub weekly_per_session: Option<f64>,
     /// 마지막으로 성공한 조회 시각. 실패해도 이전 값을 유지한다.
     pub updated_at: Option<DateTime<Utc>>,
 }
@@ -240,6 +242,13 @@ pub async fn refresh_all(app: &AppHandle) {
                         let hist = rt.history.get(&format!("{}|{}", account.id, k))?;
                         build_trend(k, hist, now)
                     });
+                    let weekly_per_session = match (
+                        rt.history.get(&format!("{}|session", account.id)),
+                        rt.history.get(&format!("{}|weekly", account.id)),
+                    ) {
+                        (Some(s), Some(w)) => weekly_per_session(s, w, now),
+                        _ => None,
+                    };
                     rt.statuses.insert(
                         account.id.clone(),
                         AccountStatus {
@@ -251,6 +260,7 @@ pub async fn refresh_all(app: &AppHandle) {
                             extra_usage,
                             badge,
                             trend,
+                            weekly_per_session,
                             updated_at: Some(now),
                         },
                     );
@@ -278,6 +288,7 @@ pub async fn refresh_all(app: &AppHandle) {
                             extra_usage: prev.as_ref().is_some_and(|p| p.extra_usage),
                             badge: prev.as_ref().and_then(|p| p.badge.clone()),
                             trend: prev.as_ref().and_then(|p| p.trend.clone()),
+                            weekly_per_session: prev.as_ref().and_then(|p| p.weekly_per_session),
                             updated_at: prev.and_then(|p| p.updated_at),
                         },
                     );
@@ -311,6 +322,38 @@ fn push_sample(hist: &mut Vec<Sample>, now: DateTime<Utc>, p: f64, r: Option<Dat
         }
     }
     hist.push(Sample { t: now, p, r });
+}
+
+/// 비율 계산에 쓸 최소 5시간 사용량 합(%p). 이보다 적으면 오차가 커서 표시하지 않는다.
+const RATIO_MIN_SESSION_PP: f64 = 20.0;
+/// 이 간격보다 멀리 떨어진 기록은 앱이 꺼져 있던 구간으로 보고 계산에서 뺀다.
+const RATIO_MAX_GAP_MINUTES: i64 = 40;
+
+/// 최근 7일 기록에서 "5시간 한도 100%를 쓸 때 주간 한도가 몇 %p 줄어드는지"를 구한다.
+/// 이웃한 5시간 기록 두 개 사이에서 5시간 사용률이 오른 만큼과, 같은 시점의 주간 사용률이 오른 만큼을
+/// 각각 더해 비율을 낸다. 초기화를 사이에 둔 구간과 앱이 꺼져 있던 구간은 짝이 맞지 않아 뺀다.
+fn weekly_per_session(session: &[Sample], weekly: &[Sample], now: DateTime<Utc>) -> Option<f64> {
+    let from = now - Duration::days(7);
+    // 기록은 값이 바뀔 때(또는 몇 분마다) 남으므로, 어떤 시각의 주간 값은 그 시각 이전의 마지막 기록이다
+    let weekly_at = |t: DateTime<Utc>| weekly.iter().rev().find(|w| w.t <= t);
+    let (mut ds, mut dw) = (0.0, 0.0);
+    for pair in session.windows(2) {
+        let (a, b) = (&pair[0], &pair[1]);
+        if a.t < from || b.t - a.t > Duration::minutes(RATIO_MAX_GAP_MINUTES) || !same_window(a.r, b.r) {
+            continue;
+        }
+        let (Some(wa), Some(wb)) = (weekly_at(a.t), weekly_at(b.t)) else { continue };
+        if !same_window(wa.r, wb.r) || b.t - wa.t > Duration::minutes(RATIO_MAX_GAP_MINUTES) {
+            continue;
+        }
+        let (d_session, d_weekly) = (b.p - a.p, wb.p - wa.p);
+        if d_session < 0.0 || d_weekly < 0.0 {
+            continue;
+        }
+        ds += d_session;
+        dw += d_weekly;
+    }
+    (ds >= RATIO_MIN_SESSION_PP).then(|| dw / ds * 100.0)
 }
 
 fn same_window(a: Option<DateTime<Utc>>, b: Option<DateTime<Utc>>) -> bool {
@@ -435,6 +478,44 @@ mod tests {
         assert_eq!(filled.iter().cloned().fold(0.0, f64::max), 30.0);
         assert!(t.start <= now - Duration::days(7) + Duration::hours(2));
         assert!(build_trend("session", &[], now).is_none());
+    }
+
+    #[test]
+    fn ratio_from_paired_increases() {
+        let now = Utc::now();
+        let sr = Some(now + Duration::hours(2));
+        let wr = Some(now + Duration::days(3));
+        let at = |m: i64| now - Duration::minutes(m);
+        // 5시간: 0 → 10 → 30 → 50 (3분 간격), 주간: 0 → 2 → 6 → 10. 5시간 50%p에 주간 10%p → 100%당 20%
+        let session = vec![
+            Sample { t: at(9), p: 0.0, r: sr },
+            Sample { t: at(6), p: 10.0, r: sr },
+            Sample { t: at(3), p: 30.0, r: sr },
+            Sample { t: at(0), p: 50.0, r: sr },
+        ];
+        let weekly = vec![
+            Sample { t: at(9), p: 0.0, r: wr },
+            Sample { t: at(6), p: 2.0, r: wr },
+            Sample { t: at(3), p: 6.0, r: wr },
+            Sample { t: at(0), p: 10.0, r: wr },
+        ];
+        let r = weekly_per_session(&session, &weekly, now).unwrap();
+        assert!((r - 20.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn ratio_skips_gaps_and_needs_enough_data() {
+        let now = Utc::now();
+        let sr = Some(now + Duration::hours(2));
+        let wr = Some(now + Duration::days(3));
+        // 두 기록 사이가 3시간(앱이 꺼져 있던 구간)이면 계산하지 않는다
+        let session = vec![Sample { t: now - Duration::hours(3), p: 0.0, r: sr }, Sample { t: now, p: 80.0, r: sr }];
+        let weekly = vec![Sample { t: now - Duration::hours(3), p: 0.0, r: wr }, Sample { t: now, p: 30.0, r: wr }];
+        assert_eq!(weekly_per_session(&session, &weekly, now), None);
+        // 5시간 사용량 합이 20%p 미만이면 표시하지 않는다
+        let session = vec![Sample { t: now - Duration::minutes(3), p: 0.0, r: sr }, Sample { t: now, p: 5.0, r: sr }];
+        let weekly = vec![Sample { t: now - Duration::minutes(3), p: 0.0, r: wr }, Sample { t: now, p: 1.0, r: wr }];
+        assert_eq!(weekly_per_session(&session, &weekly, now), None);
     }
 
     #[test]
