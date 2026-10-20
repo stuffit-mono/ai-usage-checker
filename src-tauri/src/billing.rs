@@ -89,9 +89,13 @@ fn parse_daily(v: &Value, provider: Provider) -> Daily {
         .collect()
 }
 
-/// `start`(UTC 0시로 내림)부터 지금까지 하루 단위 사용액을 가져온다.
+/// 조회 범위의 최소 길이. 하루도 안 되는 짧은 구간(예: 오늘 0시부터)은 서버가 거절할 수 있어
+/// 항상 이만큼은 받고, 필요한 기간만 `sum_since`로 골라 쓴다.
+const MIN_QUERY_DAYS: i64 = 7;
+
+/// `start`(UTC 0시로 내림)부터 지금까지 하루 단위 사용액을 가져온다. 최소 7일 전부터 받는다.
 pub async fn daily_costs(client: &Client, provider: Provider, key: &str, start: DateTime<Utc>) -> Result<Daily, FetchError> {
-    let start = day_start(start);
+    let start = day_start(start.min(Utc::now() - chrono::Duration::days(MIN_QUERY_DAYS)));
     let mut out = Daily::new();
     let mut page: Option<String> = None;
     for _ in 0..MAX_PAGES {

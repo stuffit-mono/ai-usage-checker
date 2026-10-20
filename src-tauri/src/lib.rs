@@ -388,6 +388,7 @@ async fn make_credit(
     balance: f64,
 ) -> Result<config::Credit, String> {
     let now = chrono::Utc::now();
+    // daily_costs는 최소 7일 범위로 받으므로, 그중 오늘(UTC) 사용액만 기준값으로 쓴다
     let daily = billing::daily_costs(client, provider, key, now).await.map_err(|e| e.message())?;
     Ok(config::Credit { balance, set_at: now, baseline_spent: billing::sum_since(&daily, now) })
 }

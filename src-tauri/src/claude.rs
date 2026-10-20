@@ -46,7 +46,8 @@ pub enum FetchError {
     Auth(String),
     RateLimited,
     Blocked,
-    Http(u16),
+    /// 상태 코드와 서버가 알려준 오류 문구(있으면)
+    Http(u16, Option<String>),
     Network(String),
     Parse(String),
 }
@@ -57,7 +58,7 @@ impl FetchError {
             Self::Auth(_) => "auth",
             Self::RateLimited => "rate_limited",
             Self::Blocked => "blocked",
-            Self::Http(_) => "http",
+            Self::Http(..) => "http",
             Self::Network(_) => "network",
             Self::Parse(_) => "parse",
         }
@@ -68,7 +69,8 @@ impl FetchError {
             Self::Auth(m) => m.clone(),
             Self::RateLimited => "조회 요청이 너무 많아 잠시 쉬었다가 다시 시도합니다.".into(),
             Self::Blocked => "서버가 요청을 차단했습니다(Cloudflare). 잠시 후 다시 시도합니다.".into(),
-            Self::Http(c) => format!("서버 오류 (HTTP {c})"),
+            Self::Http(c, Some(why)) => format!("서버 오류 (HTTP {c}): {why}"),
+            Self::Http(c, None) => format!("서버 오류 (HTTP {c})"),
             Self::Network(m) => format!("네트워크 오류: {m}"),
             Self::Parse(m) => format!("응답을 해석하지 못했습니다: {m}"),
         }
@@ -93,8 +95,23 @@ pub(crate) async fn get_json(req: RequestBuilder) -> Result<Value, FetchError> {
                 Err(FetchError::Auth("로그인이 만료되었습니다. 다시 로그인해 주세요.".into()))
             }
         }
-        _ => Err(FetchError::Http(status)),
+        _ => Err(FetchError::Http(status, error_reason(&text))),
     }
+}
+
+/// 오류 응답 본문에서 사람이 읽을 이유 문구를 꺼낸다.
+/// Anthropic `{"error":{"message":..}}`, OpenAI `{"error":{"message":..}}` 등. 너무 길면 자른다.
+fn error_reason(body: &str) -> Option<String> {
+    let v: Value = serde_json::from_str(body).ok()?;
+    let msg = v["error"]["message"]
+        .as_str()
+        .or(v["message"].as_str())
+        .or(v["detail"].as_str())?
+        .trim();
+    if msg.is_empty() {
+        return None;
+    }
+    Some(msg.chars().take(160).collect())
 }
 
 fn web_request(client: &Client, path: &str, session_key: &str) -> RequestBuilder {
@@ -322,6 +339,15 @@ mod tests {
         assert_eq!(l.len(), 3);
         assert_eq!(l[0].percent, 57.0);
         assert_eq!(l[2].label, "주간 · Fable");
+    }
+
+    #[test]
+    fn error_reason_from_body() {
+        let a = r#"{"type":"error","error":{"type":"invalid_request_error","message":"starting_at is invalid"}}"#;
+        assert_eq!(error_reason(a).as_deref(), Some("starting_at is invalid"));
+        assert_eq!(error_reason("<html>Bad Request</html>"), None);
+        let e = FetchError::Http(400, error_reason(a));
+        assert_eq!(e.message(), "서버 오류 (HTTP 400): starting_at is invalid");
     }
 
     #[test]
