@@ -61,6 +61,8 @@ pub struct Settings {
     pub compact: bool,
     /// 위젯 열기/숨기기 전역 단축키 (빈 문자열이면 사용 안 함)
     pub shortcut: String,
+    /// 로그인 시 자동 실행으로 켜졌을 때 위젯을 띄우지 않고 트레이 아이콘만 표시
+    pub start_hidden: bool,
 }
 
 pub const DEFAULT_SHORTCUT: &str = "CommandOrControl+Shift+U";
@@ -77,6 +79,7 @@ impl Default for Settings {
             tray_percent: true,
             compact: false,
             shortcut: DEFAULT_SHORTCUT.to_string(),
+            start_hidden: true,
         }
     }
 }

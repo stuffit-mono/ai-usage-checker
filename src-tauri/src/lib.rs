@@ -21,6 +21,8 @@ use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 const LOGIN_WINDOW: &str = "claude-login";
+/// 로그인 시 자동 실행으로 켜질 때 붙는 인자. 이걸 보고 위젯을 숨긴 채 시작할지 정한다.
+const AUTOSTART_ARG: &str = "--autostart";
 const CHATGPT_LOGIN_WINDOW: &str = "chatgpt-login";
 /// 로그인 창 라벨에 공통으로 들어가는 문자열 (창 위치 저장 제외, 일괄 닫기에 쓴다)
 const LOGIN_MARK: &str = "-login";
@@ -656,7 +658,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![AUTOSTART_ARG])))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
@@ -680,6 +682,7 @@ pub fn run() {
             let config = Config::load(&config_path);
             let always_on_top = config.settings.always_on_top;
             let shortcut = config.settings.shortcut.clone();
+            let start_hidden = config.settings.start_hidden && std::env::args().any(|a| a == AUTOSTART_ARG);
             let runtime = poller::Runtime {
                 history: poller::load_history(&history_path),
                 ..Default::default()
@@ -708,6 +711,15 @@ pub fn run() {
                         let _ = w2.hide();
                     }
                 });
+                // 창은 숨긴 상태로 만들어진다(tauri.conf.json). 자동 실행이면서 "숨긴 채 시작"이면 그대로 둔다.
+                if !start_hidden {
+                    win.show()?;
+                }
+            }
+
+            // 예전 버전이 등록한 자동 실행 항목에는 --autostart 인자가 없으므로, 켜져 있으면 다시 등록한다
+            if app.autolaunch().is_enabled().unwrap_or(false) {
+                let _ = app.autolaunch().enable();
             }
 
             tray::setup(app.handle())?;

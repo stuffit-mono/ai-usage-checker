@@ -7,6 +7,8 @@
   --track: rgba(31, 30, 29, 0.08);
   --accent: #d97757;
   --warn: #c99a06;
+  /* 흰 바탕에서 노랑 글자가 잘 보이도록 글자용은 더 진하게 */
+  --warn-text: #9a7400;
   --crit: #d0443a;
   --ok: #3f8f5a;
   --time: rgba(31, 30, 29, 0.32);
@@ -25,6 +27,7 @@
     --muted: #a3a19b;
     --track: rgba(255, 255, 255, 0.09);
     --warn: #f2c94c;
+    --warn-text: #f2c94c;
     --crit: #ef6a5f;
     --ok: #6cbf86;
     --time: rgba(255, 255, 255, 0.38);
@@ -164,7 +167,7 @@ main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 3px; }
 .lvl-mid .bar > i { background: var(--ok); }
 .lvl-warn .bar > i { background: var(--warn); }
 .lvl-crit .bar > i { background: var(--crit); }
-.lvl-warn .pct { color: var(--warn); }
+.lvl-warn .pct { color: var(--warn-text); }
 .lvl-crit .pct { color: var(--crit); }
 
 .sub { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 10px; margin-top: 4px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -175,9 +178,15 @@ main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 3px; }
 
 /* 최근 7일 추이 */
 .trend { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border); }
-.trend-head, .trend-axis { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); }
+.trend-head { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; color: var(--muted); }
+.trend-head span:last-child { font-size: 10px; white-space: nowrap; }
+/* 날짜 표시: 각 날의 가운데에 놓는다 */
+.trend-days { position: relative; height: 13px; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.trend-days span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
 .trend svg { display: block; width: 100%; height: 28px; margin: 4px 0 2px; background: var(--track); border-radius: 4px; }
-.trend line { stroke: var(--border); stroke-width: 0.15; vector-effect: non-scaling-stroke; }
+/* 날짜 구분선(자정). 막대 위에 그려서 항상 보이게 한다 */
+.trend line { vector-effect: non-scaling-stroke; }
+.trend line.day { stroke: var(--muted); stroke-width: 1; opacity: 0.55; }
 .trend rect { fill: var(--lv-low); }
 .trend rect.lvl-mid { fill: var(--ok); }
 .trend rect.lvl-warn { fill: var(--warn); }
@@ -253,6 +262,9 @@ details > input { margin-top: 8px; }
 .field span { display: flex; align-items: center; gap: 4px; }
 .check { display: flex; align-items: center; gap: 8px; padding: 5px 2px; cursor: pointer; }
 .check input { accent-color: var(--accent); margin: 0; }
+/* 위 항목에 딸린 하위 설정: 들여쓰고, 위 항목이 꺼져 있으면 흐리게 */
+.check.sub-check { padding-left: 22px; font-size: 12px; color: var(--muted); }
+.check.sub-check:has(input:disabled) { opacity: 0.5; cursor: default; }
 
 .account-list { list-style: none; margin: 0; padding: 0; }
 .account-list li { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 7px 8px; margin-bottom: 6px; }

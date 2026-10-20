@@ -97,6 +97,8 @@ pub struct Runtime {
     pub history: HashMap<String, Vec<Sample>>,
     pub marks: HashMap<String, NotifyMark>,
     pub backoff: HashMap<String, Backoff>,
+    /// 로그인 만료 알림을 이미 보낸 계정. 다시 조회에 성공하면 지운다.
+    pub auth_notified: std::collections::HashSet<String>,
 }
 
 const HISTORY_KEEP_DAYS: i64 = 7;
@@ -196,6 +198,7 @@ pub async fn refresh_all(app: &AppHandle) {
             match result {
                 Ok(Fetched { limits, extra_usage, plan, badge, new_secret }) => {
                     rt.backoff.remove(&account.id);
+                    rt.auth_notified.remove(&account.id);
                     if let Some(s) = new_secret {
                         let _ = config::set_secret(&account.id, &s);
                     }
@@ -253,6 +256,11 @@ pub async fn refresh_all(app: &AppHandle) {
                     );
                 }
                 Err(e) => {
+                    // 로그인(인증)이 만료되면 위젯을 숨겨 둬도 알 수 있게 한 번만 알린다
+                    if matches!(e, FetchError::Auth(_)) && rt.auth_notified.insert(account.id.clone()) {
+                        // 메시지 예: "로그인이 만료되었습니다. 다시 로그인해 주세요." / "OpenAI Admin 키가 올바르지 않거나…"
+                        notes.push((format!("{} · 다시 로그인 필요", account.label), e.message()));
+                    }
                     if matches!(e, FetchError::RateLimited | FetchError::Blocked) {
                         let b = rt.backoff.entry(account.id.clone()).or_default();
                         b.factor = (b.factor.max(1) * 2).min(16);

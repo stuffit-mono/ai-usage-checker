@@ -186,20 +186,35 @@ function trendHtml(t) {
       return `<rect class="${level(v)}" x="${i + 0.1}" y="${H - h}" width="0.8" height="${h}"><title>${esc(tip)}</title></rect>`;
     })
     .join("");
-  // 하루 경계(현지 자정)에 옅은 세로선
+  // 하루 경계(현지 자정)마다 구분선, 그래프 아래에 날짜 표시.
+  // 위치는 실제 시각으로 계산한다(버킷은 UTC 2시간 단위라 현지 자정이 칸 중간에 올 수 있다).
+  const end = start + n * stepMs;
+  const xOf = (ms) => ((ms - start) / (end - start)) * n;
+  const pct = (ms) => ((ms - start) / (end - start)) * 100;
   const lines = [];
-  for (let i = 1; i < n; i++) {
-    const d = new Date(start + i * stepMs);
-    if (d.getHours() < t.bucket_hours && new Date(start + (i - 1) * stepMs).getDate() !== d.getDate()) {
-      lines.push(`<line x1="${i}" x2="${i}" y1="0" y2="${H}"/>`);
+  const labels = [];
+  const today = new Date().toDateString();
+  const day = new Date(start);
+  day.setHours(0, 0, 0, 0);
+  for (; day.getTime() < end; day.setDate(day.getDate() + 1)) {
+    const midnight = day.getTime();
+    const next = new Date(day);
+    next.setDate(next.getDate() + 1);
+    if (midnight > start) lines.push(`<line class="day" x1="${xOf(midnight)}" x2="${xOf(midnight)}" y1="0" y2="${H}"/>`);
+    // 그래프에 하루의 절반 이상 걸친 날만 날짜를 적는다(양 끝의 짧은 조각은 생략)
+    const from = Math.max(midnight, start);
+    const to = Math.min(next.getTime(), end);
+    if (to - from >= 12 * HOUR) {
+      const text = day.toDateString() === today ? "오늘" : `${day.getMonth() + 1}/${day.getDate()}`;
+      labels.push(`<span style="left:${pct((from + to) / 2)}%">${text}</span>`);
     }
   }
   const what = t.key === "session" ? "5시간 사용률" : "주간 사용률";
   return `
     <div class="trend">
       <div class="trend-head"><span>최근 7일 ${what}</span><span>2시간 단위 최대값</span></div>
-      <svg viewBox="0 0 ${n} ${H}" preserveAspectRatio="none" aria-label="최근 7일 ${what} 추이">${lines.join("")}${bars}</svg>
-      <div class="trend-axis"><span>7일 전</span><span>지금</span></div>
+      <svg viewBox="0 0 ${n} ${H}" preserveAspectRatio="none" aria-label="최근 7일 ${what} 추이"><title>세로선 = 자정(날짜 바뀜)</title>${bars}${lines.join("")}</svg>
+      <div class="trend-days">${labels.join("")}</div>
     </div>`;
 }
 
@@ -366,6 +381,8 @@ function renderSettings() {
   $("set-shortcut").value = prettyShortcut(s.shortcut ?? "");
   $("set-ontop").checked = s.always_on_top;
   $("set-autostart").checked = snap.autostart;
+  $("set-start-hidden").checked = s.start_hidden ?? true;
+  $("set-start-hidden").disabled = !snap.autostart;
 }
 
 /** "CommandOrControl+Shift+U" → "Ctrl+Shift+U" (macOS는 "Cmd") */
@@ -430,6 +447,7 @@ function saveSettings() {
     notify_reset: $("set-notify-reset").checked,
     tray_percent: $("set-tray-percent").checked,
     compact: $("set-compact").checked,
+    start_hidden: $("set-start-hidden").checked,
     always_on_top: $("set-ontop").checked,
   };
   call("update_settings", { settings: s });
@@ -562,7 +580,7 @@ $("set-shortcut").addEventListener("keydown", (e) => {
     .catch(() => ($("set-shortcut").value = prettyShortcut(snap.settings.shortcut ?? "")));
 });
 
-for (const id of ["set-interval", "set-warn", "set-crit", "set-notify", "set-notify-reset", "set-tray-percent", "set-compact", "set-ontop"]) {
+for (const id of ["set-interval", "set-warn", "set-crit", "set-notify", "set-notify-reset", "set-tray-percent", "set-compact", "set-ontop", "set-start-hidden"]) {
   $(id).addEventListener("change", saveSettings);
 }
 $("set-autostart").addEventListener("change", (e) => call("set_autostart", { enabled: e.target.checked }));

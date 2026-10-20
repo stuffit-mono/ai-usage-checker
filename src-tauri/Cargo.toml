@@ -1,6 +1,6 @@
 [package]
 name = "ai-usage-checker"
-version = "0.2.5"
+version = "0.2.6"
 description = "Claude / ChatGPT usage widget"
 authors = ["a_lonely_designer <lonelydesigners@gmail.com>"]
 license = "LicenseRef-Proprietary"
